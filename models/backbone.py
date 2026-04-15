@@ -136,35 +136,3 @@ class ResNetBackbone(nn.Module):
     def num_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def get_alpha_values(self) -> dict:
-        """Return learned α values from all ScaledResidual blocks."""
-        alphas = {}
-        for name, param in self.named_parameters():
-            if 'alpha' in name:
-                alphas[name] = param.item()
-        return alphas
-
-    def get_gate_statistics(self) -> dict:
-        """
-        Run a dummy forward pass with hooks to collect mean gate activations.
-        Useful for analysing how much the gated shortcut is open per block.
-        """
-        gate_stats = {}
-        hooks = []
-
-        def make_hook(name):
-            def hook(module, inp, out):
-                gate_stats[name] = {
-                    'mean': out.mean().item(),
-                    'std':  out.std().item(),
-                    'min':  out.min().item(),
-                    'max':  out.max().item(),
-                }
-            return hook
-
-        for name, module in self.named_modules():
-            from .blocks import ShortcutGate
-            if isinstance(module, ShortcutGate):
-                hooks.append(module.register_forward_hook(make_hook(name)))
-
-        return gate_stats, hooks  # caller must call hook.remove()
