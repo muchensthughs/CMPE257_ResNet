@@ -1,17 +1,13 @@
 import torch
-import torch.nn as nn
-from typing import Optional
 
-from .base import ResidualBlockBase, conv3x3
+from .base import ResidualBlockBase
 
 
 class BaselineBlock(ResidualBlockBase):
     """
-    Standard residual block.
+    Baseline residual block: y = F(x) + x
 
-    Shortcut is identity or a learned projection when dimensions change.
-
-    Forward: out = ReLU(F(x) + shortcut(x))
+    Inherits the shared F(x) pathway from ResidualBlockBase.
     """
 
     def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:

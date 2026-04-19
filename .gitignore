@@ -1,0 +1,17 @@
+# Dataset — downloaded at runtime by torchvision
+data/
+
+# Training artifacts — generated per run
+runs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+
+# IDE
+.idea/
+.vscode/
