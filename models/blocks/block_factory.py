@@ -1,43 +1,31 @@
-"""
-models/blocks/block_factory.py
-==============================
-Block factory for creating and managing residual block variants.
-"""
-
 from typing import Type
 
 from .baseline import BaselineBlock
+from .plain import PlainBlock
 
 
 class BlockFactory:
-    """
-    Factory for creating and managing residual block variants.
-    
-    Provides a centralized registry of available block types and methods
-    to retrieve them by name.
-    """
-    
+
     _registry = {
-        'baseline':    BaselineBlock
+        'baseline':    BaselineBlock,
+        'no_residual': PlainBlock,
     }
-    
+
     @classmethod
     def get(cls, variant: str) -> Type:
         if variant not in cls._registry:
             raise ValueError(
                 f"Unknown block variant='{variant}'. "
+                f"Choose from {sorted(cls._registry)}"
             )
         return cls._registry[variant]
-    
+
     @classmethod
     def registry(cls) -> dict:
-        """Return the full registry as a dict."""
         return cls._registry.copy()
 
 
-# Backward compatibility: maintain get_block function and BLOCK_REGISTRY
 def get_block(variant: str) -> Type:
-    """Return the block class for the requested variant."""
     return BlockFactory.get(variant)
 
 
