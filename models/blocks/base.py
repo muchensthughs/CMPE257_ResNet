@@ -1,7 +1,12 @@
 import torch
 import torch.nn as nn
 
-FILTERS = 64
+# Number of convolutional filters (output channels) used by every Conv2d in
+# every block, for every variant, at every depth. Locked at 64 per the variants
+# paper §6.2.1 so that block capacity is identical across runs — any observed
+# difference in accuracy or gradient flow is then attributable solely to the
+# skip-connection mechanism, not to channel-width changes.
+BLOCK_CHANNELS = 64
 
 
 def conv3x3(in_channels: int, out_channels: int) -> nn.Conv2d:
@@ -20,11 +25,11 @@ class ResidualBlockBase(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = conv3x3(FILTERS, FILTERS)
-        self.bn1   = nn.BatchNorm2d(FILTERS)
+        self.conv1 = conv3x3(BLOCK_CHANNELS, BLOCK_CHANNELS)
+        self.bn1   = nn.BatchNorm2d(BLOCK_CHANNELS)
         self.relu  = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(FILTERS, FILTERS)
-        self.bn2   = nn.BatchNorm2d(FILTERS)
+        self.conv2 = conv3x3(BLOCK_CHANNELS, BLOCK_CHANNELS)
+        self.bn2   = nn.BatchNorm2d(BLOCK_CHANNELS)
 
     def _body(self, x: torch.Tensor) -> torch.Tensor:
         out = self.relu(self.bn1(self.conv1(x)))

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from .blocks import get_block
-from .blocks.base import FILTERS
+from .blocks.base import BLOCK_CHANNELS
 
 _VALID_DEPTHS = {4, 8}
 
@@ -27,20 +27,20 @@ class ResNetBackbone(nn.Module):
             raise ValueError(f"depth must be one of {_VALID_DEPTHS}, got {depth}")
 
         self.variant = variant
-        self.depth   = depth
+        self.depth = depth
 
         block_cls = get_block(variant)
 
         self.stem = nn.Sequential(
-            nn.Conv2d(3, FILTERS, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(FILTERS),
+            nn.Conv2d(3, BLOCK_CHANNELS, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(BLOCK_CHANNELS),
             nn.ReLU(inplace=True),
         )
 
         self.blocks = nn.Sequential(*[block_cls() for _ in range(depth)])
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc      = nn.Linear(FILTERS, num_classes)
+        self.fc = nn.Linear(BLOCK_CHANNELS, num_classes)
 
         self._init_weights()
 
