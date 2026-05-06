@@ -83,6 +83,7 @@ def main():
              f"params={model.num_parameters:,}")
 
     # ── Load test data ────────────────────────────────────────────────────
+    # This loads the official CIFAR-10 test set (10,000 images)
     test_loader = build_dataloaders(cfg, split='test')
     log.info(f"Test set size: {len(test_loader.dataset)}")
 

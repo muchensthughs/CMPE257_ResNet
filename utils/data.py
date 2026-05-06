@@ -145,6 +145,9 @@ def build_dataloaders(cfg: dict, split: str = 'train_val') -> Tuple[DataLoader, 
 
     # 4. Handle Test Split (Official 10,000 images)
     if split in ['test', 'all']:
+        # using train=False ensures we are consistently 
+        # loading the CIFAR-10 test set (10,000 images), 
+        # which is a static, pre-defined subset of the original data
         test_ds = datasets.CIFAR10(
             root, train=False, download=True,
             transform=_build_val_transforms()
