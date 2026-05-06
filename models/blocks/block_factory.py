@@ -2,6 +2,7 @@ from typing import Type
 
 from .baseline import BaselineBlock
 from .plain import PlainBlock
+from .gated import GatedBlock
 from .scaled import ScaledBlock
 
 
@@ -10,6 +11,7 @@ class BlockFactory:
     _registry = {
         'baseline':    BaselineBlock,
         'no_residual': PlainBlock,
+        'gated':       GatedBlock,
         'scaled': ScaledBlock,
     }
 
