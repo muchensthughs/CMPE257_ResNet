@@ -161,6 +161,42 @@ class Trainer:
             'val_loss': loss_m.avg,
             'val_acc1': acc1_m.avg,
         }
+    
+    # ------------------------------------------------------------------
+    # Public: evaluation (can be used for final testing)
+    # ------------------------------------------------------------------
+
+    @torch.no_grad()
+    def evaluate(self, loader: DataLoader) -> Dict[str, float]:
+        """
+        Public evaluation method. 
+        Can be used for validation during training or final testing.
+        """
+        self.model.eval()
+        
+        loss_m = AverageMeter('loss')
+        acc1_m = AverageMeter('acc1')
+        acc5_m = AverageMeter('acc5')
+
+        for images, targets in loader:
+            images  = images.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
+
+            logits = self.model(images)
+            loss   = self.criterion(logits, targets)
+
+            # Calculate both Top-1 and Top-5 accuracy
+            acc1, acc5 = accuracy(logits, targets, topk=(1, 5))
+            
+            loss_m.update(loss.item(), images.size(0))
+            acc1_m.update(acc1.item(), images.size(0))
+            acc5_m.update(acc5.item(), images.size(0))
+
+        return {
+            'loss': loss_m.avg,
+            'acc1': acc1_m.avg,
+            'acc5': acc5_m.avg,
+        }
 
     # ------------------------------------------------------------------
     # Private: gradient norm collection (paper section 6.2.5)

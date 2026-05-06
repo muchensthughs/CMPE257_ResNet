@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Tuple
 
 import torch
-from torch.utils.data import DataLoader
+import numpy as np
+from torch.utils.data import DataLoader, Subset, Dataset
 import torchvision.datasets as datasets
 import torchvision.transforms as T
 
@@ -25,6 +26,26 @@ import torchvision.transforms as T
 CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2470, 0.2435, 0.2616)
 
+# ---------------------------------------------------------------------------
+# Transform Wrapper
+# ---------------------------------------------------------------------------
+
+class ApplyTransform(Dataset):
+    """
+    A small wrapper to apply specific transforms to a Subset of a dataset.
+    """
+    def __init__(self, subset, transform=None):
+        self.subset = subset
+        self.transform = transform
+        
+    def __getitem__(self, index):
+        x, y = self.subset[index]
+        if self.transform:
+            x = self.transform(x)
+        return x, y
+        
+    def __len__(self):
+        return len(self.subset)
 
 # ---------------------------------------------------------------------------
 # Transform builders
@@ -65,9 +86,13 @@ def _build_val_transforms() -> T.Compose:
 # Main factory
 # ---------------------------------------------------------------------------
 
-def build_dataloaders(cfg: dict) -> Tuple[DataLoader, DataLoader]:
+def build_dataloaders(cfg: dict, split: str = 'train_val') -> Tuple[DataLoader, DataLoader]:
     """
-    Build (train_loader, val_loader) for CIFAR-10.
+    Build dataloaders for CIFAR-10.
+
+    Args:
+        cfg: Configuration dictionary
+        split: One of 'train_val' (returns train+val), 'test' (returns test only), or 'all' (returns all three)
 
     Config keys used:
       training.batch_size
@@ -79,23 +104,57 @@ def build_dataloaders(cfg: dict) -> Tuple[DataLoader, DataLoader]:
     bs      = tcfg.get('batch_size', 128)
     workers = tcfg.get('num_workers', 4)
     pin     = tcfg.get('pin_memory', True)
+    val_split = tcfg.get('val_split', 0.1)
 
-    train_ds = datasets.CIFAR10(
-        root, train=True, download=True,
-        transform=_build_train_transforms(cfg))
-    val_ds = datasets.CIFAR10(
-        root, train=False, download=True,
-        transform=_build_val_transforms())
+    if split in ['train_val', 'all']:
+        # 1. Load the official Training set (50,000 images)
+        # We load without transforms initially to apply them via our wrapper
+        full_train_ds = datasets.CIFAR10(root, train=True, download=True)
+        
+        # 2. Create deterministic indices for the split
+        indices = list(range(len(full_train_ds)))
+        split_idx = int(np.floor(val_split * len(full_train_ds)))
+        
+        # Using a fixed seed ensures your Val set is the same every time you run
+        np.random.seed(42)
+        np.random.shuffle(indices)
+        
+        train_idx, val_idx = indices[split_idx:], indices[:split_idx]
 
-    train_loader = DataLoader(
-        train_ds, batch_size=bs, shuffle=True,
-        num_workers=workers, pin_memory=pin,
-        drop_last=True, persistent_workers=(workers > 0),
-    )
-    val_loader = DataLoader(
-        val_ds, batch_size=bs * 2, shuffle=False,
-        num_workers=workers, pin_memory=pin,
-        persistent_workers=(workers > 0),
-    )
+        # 3. Create Subsets with specific transforms
+        train_ds = ApplyTransform(
+            Subset(full_train_ds, train_idx), 
+            transform=_build_train_transforms(cfg)
+        )
+        val_ds = ApplyTransform(
+            Subset(full_train_ds, val_idx), 
+            transform=_build_val_transforms()
+        )
 
-    return train_loader, val_loader
+        train_loader = DataLoader(
+            train_ds, batch_size=bs, shuffle=True,
+            num_workers=workers, pin_memory=pin, drop_last=True
+        )
+        val_loader = DataLoader(
+            val_ds, batch_size=bs * 2, shuffle=False,
+            num_workers=workers, pin_memory=pin
+        )
+
+        if split == 'train_val':
+            return train_loader, val_loader
+
+    # 4. Handle Test Split (Official 10,000 images)
+    if split in ['test', 'all']:
+        test_ds = datasets.CIFAR10(
+            root, train=False, download=True,
+            transform=_build_val_transforms()
+        )
+        test_loader = DataLoader(
+            test_ds, batch_size=bs * 2, shuffle=False,
+            num_workers=workers, pin_memory=pin
+        )
+        
+        if split == 'test':
+            return test_loader
+        else: # split == 'all'
+            return train_loader, val_loader, test_loader
