@@ -2,7 +2,9 @@
 data/
 
 # Training artifacts — generated per run
-runs/
+# inculde run data for visualization purpose
+runs/**/*.pt    
+runs/**/.DS_Store
 
 # Python
 __pycache__/

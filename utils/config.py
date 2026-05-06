@@ -15,6 +15,11 @@ def load_yaml(path: str | Path) -> Dict[str, Any]:
     """Load a YAML file into a plain dict."""
     with open(path) as f:
         return yaml.safe_load(f) or {}
+    
+def load_json(path: str | Path) -> Dict[str, Any]:
+    """Load a JSON file into a plain dict."""
+    with open(path) as f:
+        return json.load(f) or {}
 
 
 def deep_merge(base: dict, override: dict) -> dict:
