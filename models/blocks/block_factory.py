@@ -3,6 +3,7 @@ from typing import Type
 from .baseline import BaselineBlock
 from .plain import PlainBlock
 from .gated import GatedBlock
+from .scaled import ScaledBlock
 
 
 class BlockFactory:
@@ -11,6 +12,7 @@ class BlockFactory:
         'baseline':    BaselineBlock,
         'no_residual': PlainBlock,
         'gated':       GatedBlock,
+        'scaled': ScaledBlock,
     }
 
     @classmethod

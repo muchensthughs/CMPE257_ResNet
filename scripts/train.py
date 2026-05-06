@@ -142,6 +142,7 @@ def main():
 
     log.info(f"Training complete. Best val acc@1: {summary['best_val_acc1']:.2f}%")
     log.info(f"Artifacts saved to: {run_dir}")
+    log.info(f"To test the model, run: python scripts/test.py --checkpoint {run_dir / 'best.pt'} --config {run_dir / 'config.json'}")
 
 
 if __name__ == '__main__':
