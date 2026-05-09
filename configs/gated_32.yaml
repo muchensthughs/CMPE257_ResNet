@@ -2,8 +2,8 @@ experiment:
   seed: 42
 
 model:
-  variant: baseline       # baseline | no_residual | scaled | gated
-  depth: 4                # 4, 32, or 50 (paper section 6.2)
+  variant: gated          # paper section 6.2.2: y = x + g(x) F(x)
+  depth: 32               # 32-layer configuration (degradation-problem ladder)
 
 training:
   epochs: 200             # paper section 6.2.4: 200 epochs

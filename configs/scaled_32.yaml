@@ -2,8 +2,9 @@ experiment:
   seed: 42
 
 model:
-  variant: gated          # paper section 6.2.2: y = x + g(x) F(x)
-  depth: 8                # paper section 6.2: 8-layer configuration
+  variant: scaled         # paper section 6.2.2: y = x + alpha * F(x)
+  depth: 32               # 32-layer configuration (degradation-problem ladder)
+  alpha: 1.0              # TODO: team to verify — learnable scalar for residual branch only
 
 training:
   epochs: 200             # paper section 6.2.4: 200 epochs
