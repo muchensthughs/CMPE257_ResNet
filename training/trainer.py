@@ -90,11 +90,15 @@ class Trainer:
                 self.best_acc1 = val_metrics['val_acc1']
             self.ckpt_mgr.save(self.model, self.optimizer, epoch, val_metrics, is_best)
 
+            train_err = 100.0 - train_metrics['train_acc1']
+            val_err   = 100.0 - val_metrics['val_acc1']
+            best_err  = 100.0 - self.best_acc1
+
             log.info(
                 f"Epoch {epoch:3d}/{self.epochs}  "
                 f"loss={train_metrics['train_loss']:.4f}  "
-                f"val_acc1={val_metrics['val_acc1']:.2f}%  "
-                f"best={self.best_acc1:.2f}%  "
+                f"train_err={train_err:.2f}%  "
+                f"val_err={val_err:.2f}%  "
                 f"lr={lr:.2e}  "
                 f"time={epoch_time:.1f}s"
             )

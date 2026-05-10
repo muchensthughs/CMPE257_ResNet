@@ -3,8 +3,9 @@
     "seed": 42
   },
   "model": {
-    "variant": "baseline",
-    "depth": 8
+    "variant": "scaled",
+    "depth": 4,
+    "alpha": 1.0
   },
   "training": {
     "epochs": 200,

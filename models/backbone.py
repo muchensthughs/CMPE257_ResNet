@@ -4,7 +4,7 @@ import torch.nn as nn
 from .blocks import get_block
 from .blocks.base import BLOCK_CHANNELS
 
-_VALID_DEPTHS = {4, 8}
+_VALID_DEPTHS = {4, 32, 50}
 
 
 class ResNetBackbone(nn.Module):
@@ -16,7 +16,7 @@ class ResNetBackbone(nn.Module):
 
     Args:
         variant     : block variant name registered in block_factory
-        depth       : total number of blocks — 4 or 8
+        depth       : total number of blocks — 4, 32, or 50
         num_classes : output dimension (10 for CIFAR-10)
     """
 

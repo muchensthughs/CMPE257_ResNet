@@ -2,8 +2,8 @@ experiment:
   seed: 42
 
 model:
-  variant: baseline       # paper section 6.2.2: y = F(x) + x
-  depth: 8                # paper section 6.2: 8-layer configuration
+  variant: no_residual    # paper section 6.2.2: y = F(x) — no skip connection
+  depth: 32               # 32-layer configuration (degradation-problem ladder)
 
 training:
   epochs: 200             # paper section 6.2.4: 200 epochs
