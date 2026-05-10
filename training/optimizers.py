@@ -15,6 +15,20 @@ from torch.optim.lr_scheduler import (
     SequentialLR,
 )
 
+#added to help alpha not be affected in weight decay for varients
+#handling alpha values
+def _param_groups(model: nn.Module, wd: float):
+    """Split parameters into two groups: variant scaling params (no decay) and everything else."""
+    decay, no_decay = [], []
+    for name, param in model.named_parameters():
+        if 'alpha' in name:
+            no_decay.append(param)
+        else:
+            decay.append(param)
+    return [
+        {'params': decay,    'weight_decay': wd},
+        {'params': no_decay, 'weight_decay': 0.0},
+    ]
 
 def build_optimizer(model: nn.Module, cfg: dict) -> torch.optim.Optimizer:
     """Build an optimizer from config."""
@@ -25,14 +39,14 @@ def build_optimizer(model: nn.Module, cfg: dict) -> torch.optim.Optimizer:
 
     if name == 'sgd':
         return SGD(
-            model.parameters(), lr=lr, weight_decay=wd,
+            _param_groups(model, wd), lr=lr,
             momentum=ocfg.get('momentum', 0.9),
             nesterov=ocfg.get('nesterov', True),
         )
     elif name == 'adam':
-        return Adam(model.parameters(), lr=lr, weight_decay=wd)
+        return Adam(_param_groups(model, wd), lr=lr)
     elif name == 'adamw':
-        return AdamW(model.parameters(), lr=lr, weight_decay=wd)
+        return AdamW(_param_groups(model, wd), lr=lr)
     else:
         raise ValueError(f"Unknown optimizer '{name}'. Choose sgd | adam | adamw.")
 
