@@ -15,9 +15,7 @@ from torch.optim.lr_scheduler import (
     SequentialLR,
 )
 
-
 def build_optimizer(model: nn.Module, cfg: dict) -> torch.optim.Optimizer:
-    """Build an optimizer from config."""
     ocfg = cfg.get('optimizer', {})
     name = ocfg.get('name', 'sgd').lower()
     lr   = ocfg.get('lr', 0.1)
@@ -33,6 +31,37 @@ def build_optimizer(model: nn.Module, cfg: dict) -> torch.optim.Optimizer:
         return Adam(model.parameters(), lr=lr, weight_decay=wd)
     elif name == 'adamw':
         return AdamW(model.parameters(), lr=lr, weight_decay=wd)
+    else:
+        raise ValueError(f"Unknown optimizer '{name}'. Choose sgd | adam | adamw.")
+
+#Build an optimizer for the scaled variant — excludes alpha params from weight decay."""
+def build_optimizer_scaled(model: nn.Module, cfg: dict) -> torch.optim.Optimizer:
+    ocfg = cfg.get('optimizer', {})
+    name = ocfg.get('name', 'sgd').lower()
+    lr   = ocfg.get('lr', 0.1)
+    wd   = ocfg.get('weight_decay', 5e-4)
+
+    decay, no_decay = [], []
+    for pname, param in model.named_parameters():
+        if 'alpha' in pname:
+            no_decay.append(param)
+        else:
+            decay.append(param)
+    param_groups = [
+        {'params': decay,    'weight_decay': wd},
+        {'params': no_decay, 'weight_decay': 0.0},
+    ]
+
+    if name == 'sgd':
+        return SGD(
+            param_groups, lr=lr,
+            momentum=ocfg.get('momentum', 0.9),
+            nesterov=ocfg.get('nesterov', True),
+        )
+    elif name == 'adam':
+        return Adam(param_groups, lr=lr)
+    elif name == 'adamw':
+        return AdamW(param_groups, lr=lr)
     else:
         raise ValueError(f"Unknown optimizer '{name}'. Choose sgd | adam | adamw.")
 
