@@ -4,7 +4,6 @@ experiment:
 model:
   variant: scaled         # paper section 6.2.2: y = x + alpha * F(x)
   depth: 4                # paper section 6.2: 4-layer configuration
-  alpha: 0.5              # scalar for residual branch only
 
 training:
   epochs: 200             # paper section 6.2.4: 200 epochs
