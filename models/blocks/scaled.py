@@ -18,7 +18,7 @@ class ScaledBlock(ResidualBlockBase):
 
     def __init__(self):
         super().__init__()
-        self.alpha = 0.1
+        self.alpha = nn.Parameter(torch.tensor(1.0))
 
     def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
         return identity + self.alpha * out
