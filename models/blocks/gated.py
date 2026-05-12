@@ -24,6 +24,8 @@ class GatedBlock(ResidualBlockBase):
             kernel_size=1, stride=1, padding=0, bias=True,
         )
 
+        nn.init.constant_(self.gate_conv.bias, -2.0)
+
     def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
         gate = torch.sigmoid(self.gate_conv(identity))
         return identity + gate * out
