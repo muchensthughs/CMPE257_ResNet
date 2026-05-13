@@ -45,8 +45,10 @@ class ResNetBackbone(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        for m in self.modules():
+        for name, m in self.named_modules():
             if isinstance(m, nn.Conv2d):
+                if name.endswith('gate_conv'):
+                    continue
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)

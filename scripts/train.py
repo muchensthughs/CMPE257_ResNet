@@ -33,7 +33,7 @@ import torch
 
 from models import build_model
 from training.trainer import Trainer
-from training.optimizers import build_optimizer, build_optimizer_scaled, build_scheduler
+from training.optimizers import build_optimizer, build_optimizer_scaled, build_optimizer_gated, build_scheduler
 from training.losses import build_criterion
 from utils.data import build_dataloaders
 from utils.config import load_yaml, deep_merge, \
@@ -132,6 +132,8 @@ def main():
     # ── Optimizer / scheduler / criterion ─────────────────────────────────
     if cfg['model']['variant'] == 'scaled':
         optimizer = build_optimizer_scaled(model, cfg)
+    elif cfg['model']['variant'] == 'gated':
+        optimizer = build_optimizer_gated(model, cfg)
     else:
         optimizer = build_optimizer(model, cfg)
     scheduler = build_scheduler(optimizer, cfg,
