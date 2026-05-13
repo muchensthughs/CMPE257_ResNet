@@ -1,0 +1,41 @@
+{
+  "experiment": {
+    "seed": 42
+  },
+  "model": {
+    "variant": "no_residual",
+    "depth": 50
+  },
+  "training": {
+    "epochs": 200,
+    "batch_size": 128,
+    "num_workers": 4,
+    "pin_memory": true,
+    "log_interval": 50
+  },
+  "optimizer": {
+    "name": "sgd",
+    "lr": 0.1,
+    "weight_decay": 0.0001,
+    "momentum": 0.9,
+    "nesterov": false
+  },
+  "scheduler": {
+    "name": "step",
+    "milestones": [
+      100,
+      150
+    ],
+    "gamma": 0.1
+  },
+  "augmentation": {
+    "random_crop": true,
+    "random_flip": true
+  },
+  "logging": {
+    "save_every_n_epochs": 0
+  },
+  "gradient_tracking": {
+    "enabled": true
+  }
+}
