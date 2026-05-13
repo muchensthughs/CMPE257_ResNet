@@ -4,7 +4,7 @@ import torch.nn as nn
 from .blocks import get_block
 from .blocks.base import BLOCK_CHANNELS
 
-_VALID_DEPTHS = {4, 8}
+_VALID_DEPTHS = {4, 8, 32, 50}
 
 
 class ResNetBackbone(nn.Module):

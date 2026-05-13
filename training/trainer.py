@@ -120,6 +120,7 @@ class Trainer:
 
             self.optimizer.zero_grad(set_to_none=True)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
 
             self.global_step += 1
