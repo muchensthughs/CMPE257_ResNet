@@ -1,3 +1,32 @@
+# Team Section Responsibilities Checklist
+
+- [ ] **Napoleon Salazar**
+  - [ ] Title Page
+  - [ ] Abstract
+  - [ ] Problem Statement
+  - [ ] Why These Four Variants Form a Clean Ablation
+  - [ ] List of Experiments
+  - [ ] Results (Master Comparison Table, Cross-Variant Comparison, Conclusions, Limitations, Team Contributions)
+  - [ ] Divergence from the Original Proposal
+
+- [ ] **Mu Chen**
+  - [ ] Introduction
+  - [ ] Dataset, Macro-Architecture, Training Protocol, Measurement Protocol, Implementation Details, Code and Repositories
+  - [ ] Results (Reproducing the Degradation Problem, Baseline Residual, Gradient Flow Analysis)
+  - [ ] References
+
+- [ ] **Maximilian Garcia**
+  - [ ] Entire Related Work section (including all subsections 5.1–5.8)
+  - [ ] Scaled Residual Variant
+  - [ ] Results (Scaled Residual, Computational Overhead)
+  - [ ] Limitations
+
+- [ ] **Emily Moberly**
+  - [ ] Gated Residual Variant
+  - [ ] Results (Gated Residual)
+  - [ ] Future Work
+
+---
 # Exploring Residual Connection Variants in Modern CNN Architectures
 
 # 1. Title Page
@@ -420,20 +449,3 @@ Start from the proposal's bibliography (Refs [1]–[10]). **Additions required:*
 - Loshchilov & Hutter 2017 — *Cosine annealing / SGDR* (optional, if mentioned in §8.3).
 
 Use a consistent style (`alpha` or numeric — match the proposal's existing style).
-
----
-
-# 14. Team Contributions and Task Assignments
-
-**TODO:** Napoleon Salazar
-
-Table mapping members to deliverables. Place this **after References** or as an appendix — choose whichever convention CMPE 257 / Dr. Krishna prefers.
-
-| Member            | Primary Responsibilities                                                                                                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Napoleon Salazar  | Base project setup, training-loop infrastructure, Plain & Baseline implementations, gradient logging hooks, Introduction, Problem Statement, master comparison results, Conclusions |
-| Mu Chen           | Base project setup, Plain & Baseline implementations, dataset and reproducibility plumbing, Related Work, References                                                                |
-| Maximilian Garcia | Scaled variant (implementation, analysis, $\alpha$-tracking), computational overhead analysis, Limitations                                                                          |
-| Emily Moberly     | Gated variant (implementation, analysis, gate-value tracking), Future Work                                                                                                          |
-
-Add a one-sentence integrity statement: "All members reviewed and approved every section."
