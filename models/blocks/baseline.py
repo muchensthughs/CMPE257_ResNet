@@ -10,5 +10,5 @@ class BaselineBlock(ResidualBlockBase):
     Inherits the shared F(x) pathway from ResidualBlockBase.
     """
 
-    def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
-        return out + identity
+    def _apply_shortcut(self, tensor: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
+        return tensor + identity
