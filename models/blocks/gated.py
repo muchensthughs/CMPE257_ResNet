@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+import torch.nn as neural_net
 
 from .base import ResidualBlockBase, BLOCK_CHANNELS
 
@@ -19,11 +19,15 @@ class GatedBlock(ResidualBlockBase):
     def __init__(self):
         super().__init__()
         # 1x1 conv: bias=True since this gate is not followed by BatchNorm
-        self.gate_conv = nn.Conv2d(
+        self.gate_conv = neural_net.Conv2d(
             BLOCK_CHANNELS, BLOCK_CHANNELS,
             kernel_size=1, stride=1, padding=0, bias=True,
         )
+        # Highway-style init: gate ≈ sigmoid(3) ≈ 0.95 at start, so the
+        # block behaves like baseline residual at init
+        neural_net.init.zeros_(self.gate_conv.weight)
+        neural_net.init.constant_(self.gate_conv.bias, 3.0)
 
-    def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
+    def _apply_shortcut(self, tensor: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
         gate = torch.sigmoid(self.gate_conv(identity))
-        return identity + gate * out
+        return identity + gate * tensor

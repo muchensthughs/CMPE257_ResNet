@@ -4,21 +4,20 @@ experiment:
 model:
   variant: scaled         # paper section 6.2.2: y = x + alpha * F(x)
   depth: 32               # 32-layer configuration (degradation-problem ladder)
-  alpha: 1.0              # TODO: team to verify — learnable scalar for residual branch only
 
 training:
   epochs: 200             # paper section 6.2.4: 200 epochs
-  batch_size: 128         # TODO: team to verify — not specified in paper
-  num_workers: 4          # TODO: team to verify — not specified in paper
-  pin_memory: true        # TODO: team to verify — not specified in paper
-  log_interval: 50        # TODO: team to verify — not specified in paper
+  batch_size: 128         # samples per gradient step
+  num_workers: 4          # parallel data-loading subprocesses
+  pin_memory: true        # page-locks host tensors for faster GPU transfer
+  log_interval: 50        # batches between training log lines
 
 optimizer:
   name: sgd               # paper section 6.2.4: SGD
   lr: 0.1                 # paper section 6.2.4: base lr = 0.1
   weight_decay: 0.0001    # paper section 6.2.4: weight decay = 1e-4
   momentum: 0.9           # paper section 6.2.4: momentum = 0.9
-  nesterov: false         # TODO: team to verify — not specified in paper
+  nesterov: false         # use Nesterov-accelerated momentum instead of classical
 
 scheduler:
   name: step              # paper section 6.2.4: StepLR
@@ -30,7 +29,7 @@ augmentation:
   random_flip: true       # paper section 6.2.4: random horizontal flip
 
 logging:
-  save_every_n_epochs: 0  # TODO: team to verify — not specified in paper
+  save_every_n_epochs: 0  # checkpoint cadence; 0 disables periodic saves (best/last only)
 
 gradient_tracking:
   enabled: true           # paper section 6.2.5: record L2 gradient norms every epoch

@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+import torch.nn as neural_net
 from .base import ResidualBlockBase, BLOCK_CHANNELS
 
 
@@ -18,8 +18,8 @@ class ScaledBlock(ResidualBlockBase):
 
     def __init__(self):
         super().__init__()
-        self.alpha = nn.Parameter(torch.ones(BLOCK_CHANNELS))
+        self.alpha = neural_net.Parameter(torch.ones(BLOCK_CHANNELS))
 
-    def _apply_shortcut(self, out: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
-        return identity + self.alpha.view(1, -1, 1, 1) * out
+    def _apply_shortcut(self, tensor: torch.Tensor, identity: torch.Tensor) -> torch.Tensor:
+        return identity + self.alpha.view(1, -1, 1, 1) * tensor
 
