@@ -4,8 +4,7 @@
   },
   "model": {
     "variant": "scaled",
-    "depth": 32,
-    "alpha": 1.0
+    "depth": 32
   },
   "training": {
     "epochs": 200,
