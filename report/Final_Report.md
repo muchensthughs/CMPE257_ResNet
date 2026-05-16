@@ -15,33 +15,32 @@
 # 2. Abstract
 
 The depth-induced degradation problem documents that increased depth alone does not guarantee higher accuracy in plain convolutional networks, motivating the residual learning paradigm of He et al. (2015). Four routing strategies were compared in this paper, namely a plain ablation with no shortcut, a Baseline residual with an identity skip, a Scaled variant with a learnable per-channel scalar on the residual branch, and a Gated variant with an input-dependent sigmoid gate on the residual branch. All four variants were trained on CIFAR-10 at depths {4, 32, 50} for 200 epochs with SGD and momentum, a StepLR schedule, and Batch Normalization as the only normalization-style regularizer. The Plain network degraded sharply with depth, with training error rising from 0.13% at depth 4 to 20.84% at depth 50, while the three residual variants reached essentially 100% training accuracy and above 93% validation accuracy at depths 32 and 50. Within the residual variants, Scaled was statistically indistinguishable from Baseline at every depth, and only the Gated variant outperformed Baseline by margins clearing single-seed noise, with a 0.46 percentage point advantage on validation and a 0.62 percentage point advantage on test at depth 50.
+
 # 3. Introduction
-
-**TODO:** Mu
 ### 3.1 Motivation and the Depth Paradox
+There is a long standing intuition in convolutional neural networks that deeper networks should learn better. A deeper model occupies a larger hypothesis space, and classical capacity arguments (Goodfellow et al., Ch. 5; Bishop §1.1) suggest that the added layers should, in principle, allow a deeper network to approximate any function at least as well as its shallower counterpart. In practice, this intuition breaks down as stacking more layers on a plain convolutional network does not necessarily improve accuracy; beyond a certain depth, accuracy saturates or even degrades — not because the model is overfitting, but because training error itself rises with depth.
 
-- Reuse and expand the opening paragraph from the proposal's §1 ("The architectural evolution of convolutional neural networks…").
-- Cite Goodfellow Ch. 5 (capacity / representation) and Bishop §1.1 (hypothesis space) when stating that deeper ≠ strictly better.
-- Frame the **degradation problem** explicitly as distinct from overfitting: training error itself rises with depth in plain nets. Cite He et al. §1, Fig. 1.
+This problem is the depth-induced degradation documented in He et al. (2015, §1, Fig. 1). A 34-layer plain network trained on CIFAR-10 achieves higher training error than an 18-layer plain network trained under identical conditions. Batch normalization was applied to avoid vanishing gradient problem in both cases. Therefore, the degradation problem was not from overfitting or poor gradient propagation. Instead, the optimizer itself fails to utilize the full model capacity provided by the extra layers. Our own experiments reproduce this finding at depths {4, 32, 50}: the Plain network's training error rises from 0.13% at depth 4 to 20.84% at depth 50, confirming that depth alone was contributing to the performance bottleneck.
 
 ### 3.2 Residual Learning as the Established Fix
 
-- Reuse the proposal's §1 paragraph that introduces $H(x)$, $F(x) := H(x) - x$, $y = F(x) + x$.
-- Add textbook grounding: cite **Goodfellow §8.2.5** for the optimization-difficulty framing and **Bishop §5.3** for backpropagation through the additive shortcut.
-- One sentence on why the identity shortcut helps gradient flow: $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ — the "+1" guarantees a direct gradient path.
+He et al. (2015) proposed a way to preconditioning the network to make optimization easier. Instead of asking each stacked layer to learn the complete underlying mapping H(x) directly, we can reformulate the learning problem so that the layer learns the residual F(x)=H(x)−x. The block output is then y=F(x)+x. Here the identity term x is essentially a shorcut connection connecting a few stacked layer as a block. This allows a faster and easier optimization if the actual desired transformation is identity mapping. Pushing F(x) to 0 is much easier than pushing a non linear function to identity.
+
+The additive shortcut also has an immediate consequence for gradient flow: differentiating the loss \mathcal{L} with respect to the block input gives $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ where the "+1" term guarantees that a direct gradient path exists from any layer back to the input, regardless of the magnitude of $\partial F / \partial x$ (Goodfellow et al., §8.2.5; Bishop §5.3). Even if the residual branch saturates or its gradients vanish, the identity shortcut ensures the learning signal propagates back to early layers.
 
 ### 3.3 Contributions of This Work
 
-Bulleted list. Each bullet = one concrete deliverable:
+- A controlled study of Plain (no shortcut), Baseline (identity skip), Scaled (learnable per-channel scalar on the residual branch), and Gated (input-dependent sigmoid gate on the residual branch) routing strategies, trained at depths {4, 32, 50} on CIFAR-10 under a fixed optimizer protocol.
 
-1. A controlled, identical-protocol comparison of four residual routing strategies (Plain / Baseline / Scaled / Gated) at multiple depths.
-2. An empirical reproduction of the degradation problem at our implementation's depth scale.
-3. Layer-wise L2 gradient-norm diagnostics that visualize *how* each routing variant preserves (or fails to preserve) learning signal.
-4. An open-source reference implementation released at `github.com/muchensthughs/CMPE257_ResNet`.
+- Reproduction of the degradation problem at our implementation's depth scale, confirming that training error collapses in plain networks at depth 50.
+
+- Layer-wise L2 gradient-norm diagnostics that visualize how each routing variant preserves or fails to preserve learning signal across block depth.
+
+- An open-source reference implementation of all four variants, training scripts, configuration files, and training results, released at `github.com/muchensthughs/CMPE257_ResNet`.
 
 ### 3.4 Roadmap
 
-One short paragraph mapping sections to questions ("§4 states the questions, §5 reviews prior work, §6 describes the four solutions, §7–§8 detail experiments, §9 reports results, §10–§12 discuss conclusions, limitations, and next steps").
+The remainder of the paper is organized as follows. Section 4 formalizes the two research questions: reproduction of the degradation problem and comparison of residual variants — along with the success criteria used to evaluate them. Section 5 reviews the prior work that motivates the four variants. Section 6 defines the shared block structure and describes each routing variant in detail. Sections 7 and 8 enumerate the experimental grid and specify the dataset, macro-architecture, training protocol, and measurement procedure. Section 9 reports results for each variant and comparison between variants. Sections 10 through 12 present conclusions, limitations, and directions for future work.
 
 ---
 
@@ -106,7 +105,9 @@ Reuse the proposal's §3 structure (it already has seven well-organized subsecti
 
 # 6. Solution: Four Residual Routing Variants
 
-**TODO:** Mu
+This section describes the four block variants compared in this study. All four share the same convolutional function F(x) and the only difference is how that pathway's output is combined with the block input to produce the block output. Under this setting, any observed differences in metrics is attributable to the block function alone.
+
+The four variants cover the progression from no routing at all (Plain) to a fixed additive shortcut (Baseline) to more expressive variants of the residual branch (Scaled, Gated). Each is described in its own subsection below, covering the routing equation, the theoretical motivation, and the specific role it plays in the ablation.
 
 ### 6.1 Shared Block Structure (Reused Across All Four Variants)
 
@@ -128,18 +129,27 @@ No dropout is applied at any point inside the block, neither between the two con
 
 ### 6.2 Variant 1 — Plain Network (Ablation)
 
-**TODO:** Mu
-- Reuse proposal §4 verbatim.
-- Equation: $y = F(x)$
-- One paragraph on **expected** behavior (degradation), one paragraph on what observing degradation **proves** vs. what it would mean if absent.
+The Plain network is used as the base netowrk to prove that degradation problem does exist. Its block structure is simply the convolutional pathway with no shortcut:
+
+$$ y = F(x) $$
+
+The plain network is architecturally identical to the residual variants in every respect except the absence of a skip connection.
+
+The role of this variant is diagnosing the degradation problem and prove that basic residual network improves the optimization. We would use it to confirm that the degradation problem is reproducible under our specific implementation before any claims about residual routing variants are made. If the Plain network does not degrade with depth, we would lose the context of comparing different residual variants. On the other hand, if degradation does appear, it establishes a meaningful base against which the residual variants can be evaluated.
+
+The success criterion for this variant is that validation accuracy should be non-increasing as depth grows from 4 to 50, with a measurable collapse at depth 50 driven by rising training error rather than a widening train-to-validation gap. This is important to prove that we are not overfitting but the problem resides in optimization. 
 
 ### 6.3 Variant 2 — Baseline Residual
+The Baseline block is our direct implementation of He et al. (2015, Eqn. 1). Instead of passing the convolutional output straight to the next block, we add the original block input back through an identity shortcut.
 
-**TODO:** Mu
-- Reuse proposal §5.1 verbatim.
-- Equation: $y = x + F(x)$
-- Explicitly link to He et al. Eqn. (1).
-- Note: identity shortcut, no extra parameters, no extra FLOPs — emphasize this as the "control" that any more complex variant must beat to justify its overhead.
+$$ y=F(x)+x $$
+
+The identity shortcut adds no additional parameters and no extra computation beyond the addition itself. It is a free operation at both training and inference time.
+
+As we mentioned before, the intuition behind this formulation is that we want to change what the network learns. Without a shortcut, each non linear block need to learn the full transformation H(x) from scratch. With the shortcut, it only needs to learn the perteubation (the residual) $F(x):=H(x)−x$. One theory is that the ealier layers has already done all the heavy lifting, the rest of the layers should be taylored more towards passing along the original signal which is identity mapping. Learning a small correction toward zero is a much easier optimization process than reconstructing the full signal through a stack of non-linear layers.
+
+The Baseline is the most important variant in this study not because it is expected to be the strongest performer, but because it is the simplest possible residual formulation with no routing parameters. It sets the bar for Scaled and Gated to justify their added complexity.
+
 
 ### 6.4 Variant 3 — Scaled Residual
 
@@ -235,47 +245,46 @@ All runs use SGD with momentum 0.9, weight decay $10^{-4}$, initial learning rat
 
 ### 8.1 Dataset: CIFAR-10
 
-**TODO:** Mu
+We use the CIFAR-10 dataset (Krizhevsky, 2009) as the benchmark dataset for our experiments. It consists of 60,000 32×32 RGB images from 10 mutually exclusive classes, with the same number of images per class. We used the standars split for this dataset with 50,000 images for training/validation and 10,000 for testing. 
 
-- Brief paragraph: 60k 32×32 color images, 10 classes, 50k train / 10k test (cite Krizhevsky 2009 [6]).
-- Note we follow He et al. §4.2's CIFAR-10 protocol (4-pixel pad + 32×32 random crop + horizontal flip + per-channel normalization).
-- Confirm: no test-time augmentation; single 32×32 center evaluation, matching He et al.
+We followed the training protocol of He et al. (2015, §4.2): each image is zero-padded by 4 pixels on each side and a random 32×32 crop is taken, followed by a random horizontal flip. We normalized the pixel values per channel using training set mean and standard deviation. The test set is used only once per run at the end of training, without applying any augmentation to the images.
+
 
 ### 8.2 Macro-Architecture
 
-**TODO:** Mu
+All four variants share an identical macro-architecture: a convolutional stem, a flat block stack, and a classification head. The stem is a single 3×3 convolution mapping 3 input channels to 64 output channels, with stride 1, padding 1, and no bias, followed by Batch Normalization and ReLU. No max-pooling is applied after the stem, preserving the full 32×32 spatial resolution throughout the network — appropriate for CIFAR-10's small input size and consistent with He et al.'s (2015) CIFAR-10 protocol.
 
-- Reuse proposal §6.2 verbatim.
-- Pipeline: Input Conv → N residual blocks (depth-dependent) → Global Average Pool → Linear(10).
-- Filter width fixed at **64** across all blocks (per proposal — this is a deliberate "flat" design that isolates the routing variable, *not* the channel-doubling design of He et al.).
+The block stack consists of N blocks stacked sequentially, where N ∈ {4,32,50}. Every block follows the shared structure: two 3×3 convolutions each with 64 output channels, stride 1, padding 1, and no bias term (this is a standard practice for BN as BN eventually cancels out the bias). BN is applied after each convolution with ReLU applied between them. Filter width is held flat at 64 channels across all blocks and all depths with no channel-doubling between stages. This is applied intentionally different from the original Resnet paper in order to ensure that shortcut-routing mechanism is the only variable across variants.
+
+The classification head applies Adaptive Average Pooling over the final block's spatial output, reducing the [B,64,32,32] feature map to [B,64] (B is batch size), followed by a single fully-connected linear layer mapping to 10 class logits. As a final step, we apply cross-entropy loss directly to the logits.
+
+![Macro Architecture](macro_architecture.png)
 
 ### 8.3 Training Protocol
 
-**TODO:** Mu
+All variants and experiment runs share identical optimization configuration. This is enforced so that any difference in accuracy or gradient flow can be attributed to the block structure.
 
-Reuse proposal §6.2.4 (locked optimizer settings):
+All runs use SGD with an initial learning rate of 0.1, momentum of 0.9, weight decay of $1 \times 10^{-4}$, and classical (not Nesterov) momentum. The choice of SGD over adaptive methods like Adam was intentional. Adaptive optimizers modify gradients per-parameter, which would affect the gradient-flow diagnostics. Since our objective is to study how variants affects optimization, using SGD is a cleaner approach as it preserves the raw gradients.
 
-- Optimizer: SGD
-- Initial LR: 0.1
-- Momentum: 0.9
-- Weight decay: $1 \times 10^{-4}$
-- LR schedule: StepLR — 0.1 → 0.01 at epoch 100, → 0.001 at epoch 150
-- Epochs: 200
-- Batch size: (fill in from `configs/base.yaml`)
-- **No dropout** (reiterate; cite §6.1 rationale)
+We also made adjustment to the parameters in scaled and gated variant. The per-channel α parameter is excluded from weight decay so that regularization does not push them to zero. For Gated variant, the gate_conv bias parameters are also excluded to preserve the b=3 initialization that sets the gate near 0.95. All other parameters in both variants receive the standard weight decay of $1 \times 10^{-4}$.
 
-Add a one-paragraph theoretical note citing **Goodfellow §8.3 (momentum), §8.5 (adaptive methods — explain why SGD+momentum was chosen over Adam), §8.3.1 (LR schedules)**. This is the section where the prof-flagged "Optimization" content earns credit.
+The scheduler applies a 5-epoch linear warmup from $1 \times 10^{-4}$ to 0.1, followed by StepLR with decay factor $\gamma = 0.1$
+at epochs 100 and 150, giving three phases: 0.1 for epochs 1–100, 0.01 for epochs 101–150, and 0.001 for epochs 151–200 (Goodfellow et al., §8.3.1).
+
+Each run trains for 200 epochs with a batch size of 128. Incomplete final batches are dropped to keep batch statistics consistent for Batch Normalization. The loss function is cross-entropy applied directly to the raw logits. No dropout is used at any point. Batch Normalization and data augmentation are the only active regularizers.
+
 
 ### 8.4 Measurement Protocol
 
-**TODO:** Mu
+Mean cross-entropy loss and top-1 accuracy over the training set and are recorded at the end of each epoch. Training error is used as the primary diagnotic metric for degradation problem because it is more related to optimization than generalization.
 
-Reuse proposal §6.2.5. Bullets:
+The model is also evaluated on the 5,000-image validation split after each training epoch with gradients disabled and batch normalization. We record validation loss and top-1 accuracy. The best validation accuracy across all 200 epochs is noted down, and the checkpoint at that epoch is saved as best.pt for subsequent test-set evaluation.
 
-- Training loss + accuracy per epoch
-- Validation loss + accuracy per epoch
-- L2 norm of gradients at each Conv2d layer per epoch (mean across batch)
-- Per-layer norm logged separately (required for the "Gradient Norm vs. Layer Depth" plots)
+The test set is evaluated exactly once per run, using the best.pt checkpoint selected by validation accuracy. Test evaluation reports top-1 accuracy, top-5 accuracy, and loss. The test set is never used to select hyperparameters or checkpoints — it exists solely to corroborate the validation findings reported in Section 9.1.
+
+After each backward pass we compute the L2 norm of the weight gradients for every Conv2d layer in the network and log them alongside the epoch metrics. Specifically, for a convolutional layer with weight tensor WW
+W, we record $\| \nabla_W \mathcal{L}\|_2$ at the end of the last batch of each epoch. We also record the mean norm across all Conv2d layers as a single scalar. These per-layer norms are what produce the gradient flow plots in Section 9.6 — plotting them against layer index at selected epochs shows whether gradient signal decays toward early layers (the signature of the degradation problem in plain networks) or stays roughly flat (the signature of healthy residual connectivity).
+
 
 ### 8.5 Divergence from the Original Proposal
 
@@ -285,22 +294,20 @@ At depth 8, with the flat 64-filter block defined in Section 6.1 (Shared Block S
 
 ### 8.6 Implementation Details and Reproducibility
 
-**TODO:** Mu Chen
-- Framework: PyTorch (specify version from `requirements.txt` or `venv`).
-- Hardware: (fill in — GPU model, number of GPUs).
-- Random seeds: fixed for all runs (specify value).
-- Wall-clock training time per run (optional but valuable for the Limitations discussion).
+All experiments were implemented in PyTorch using torchvision for the CIFAR-10 dataset and transforms. Training was run on A100 with a single GPU per run.
+
+Reproducibility is enforced at several levels. Every experiment config fixes the random module seed as 42, which is applied before any model construction or data loading. The 90/10 train/validation split is generated with a fixed NumPy seed 42 and a deterministic shuffle, so the same 5,000 images form the validation set across all experiments. In addition, all model weights are initialized with deterministic schemes — Kaiming normal (He et al., 2015) for Conv2d layers, constant 1 and 0 for BatchNorm, and the routing-specific initializations ($\alpha = 1$ for Scaled, W=0 and b=3 for the Gated gate).
 
 ### 8.7 Code and Repositories
 
-**TODO:** Mu
+The framework code and experiments:
+
 - Primary repo: `https://github.com/muchensthughs/CMPE257_ResNet`
-- Original prototyping notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
-- Open-source code utilized:
-  - PyTorch (BSD-3) — model, optimizer, dataloaders
-  - torchvision (BSD-3) — CIFAR-10 dataset and transforms
-  - (List any other dependencies from `requirements.txt`)
-- One-sentence statement that all training scripts, configs, and result CSVs/plots used in this report are committed to the repo for reproducibility.
+- Original experiment runs notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
+
+The implementation depends on two external libraries. PyTorch provides the model, optimizer, scheduler, and training loop. Torchvision provides the CIFAR-10 dataset and image transforms. NumPy is used for the deterministic train/validation split, and PyYAML for config loading. The code base is original to this project.
+
+All training scripts, config files, and the result CSVs and plots used in this report are committed to the repository. All experiment runs can be reproduced by checking out the repo and invoking the corresponding config. 
 
 ---
 
@@ -521,7 +528,7 @@ turns these limitations into prospective follow-up studies.
 
 # 13. References
 
-**TODO:** Mu + all members (verify their cited works)
+**TODO:** all members (verify their cited works)
 **Target length:** 1 – 1.5 pages
 
 Start from the proposal's bibliography (Refs [1]–[10]). **Additions required:**
