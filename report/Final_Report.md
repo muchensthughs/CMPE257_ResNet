@@ -1,32 +1,3 @@
-# Team Section Responsibilities Checklist
-
-- [ ] **Napoleon Salazar**
-  - [ ] Title Page
-  - [ ] Abstract
-  - [ ] Problem Statement
-  - [ ] Why These Four Variants Form a Clean Ablation
-  - [ ] List of Experiments
-  - [ ] Results (Master Comparison Table, Cross-Variant Comparison, Conclusions, Limitations, Team Contributions)
-  - [ ] Divergence from the Original Proposal
-
-- [ ] **Mu Chen**
-  - [ ] Introduction
-  - [ ] Dataset, Macro-Architecture, Training Protocol, Measurement Protocol, Implementation Details, Code and Repositories
-  - [ ] Results (Reproducing the Degradation Problem, Baseline Residual, Gradient Flow Analysis)
-  - [ ] References
-
-- [ ] **Maximilian Garcia**
-  - [ ] Entire Related Work section (including all subsections 5.1–5.8)
-  - [ ] Scaled Residual Variant
-  - [ ] Results (Scaled Residual, Computational Overhead)
-  - [ ] Limitations
-
-- [ ] **Emily Moberly**
-  - [ ] Gated Residual Variant
-  - [ ] Results (Gated Residual)
-  - [ ] Future Work
-
----
 # Exploring Residual Connection Variants in Modern CNN Architectures
 
 # 1. Title Page
