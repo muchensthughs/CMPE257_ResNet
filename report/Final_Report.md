@@ -21,10 +21,10 @@
   - [ ] Results (Scaled Residual, Computational Overhead)
   - [ ] Limitations
 
-- [ ] **Emily Moberly**
-  - [ ] Gated Residual Variant
-  - [ ] Results (Gated Residual)
-  - [ ] Future Work
+- [x] **Emily Moberly**
+  - [x] Gated Residual Variant
+  - [x] Results (Gated Residual)
+  - [x] Future Work
 
 ---
 # Exploring Residual Connection Variants in Modern CNN Architectures
