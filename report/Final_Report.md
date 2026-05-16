@@ -15,33 +15,32 @@
 # 2. Abstract
 
 The depth-induced degradation problem documents that increased depth alone does not guarantee higher accuracy in plain convolutional networks, motivating the residual learning paradigm of He et al. (2015). Four routing strategies were compared in this paper, namely a plain ablation with no shortcut, a Baseline residual with an identity skip, a Scaled variant with a learnable per-channel scalar on the residual branch, and a Gated variant with an input-dependent sigmoid gate on the residual branch. All four variants were trained on CIFAR-10 at depths {4, 32, 50} for 200 epochs with SGD and momentum, a StepLR schedule, and Batch Normalization as the only normalization-style regularizer. The Plain network degraded sharply with depth, with training error rising from 0.13% at depth 4 to 20.84% at depth 50, while the three residual variants reached essentially 100% training accuracy and above 93% validation accuracy at depths 32 and 50. Within the residual variants, Scaled was statistically indistinguishable from Baseline at every depth, and only the Gated variant outperformed Baseline by margins clearing single-seed noise, with a 0.46 percentage point advantage on validation and a 0.62 percentage point advantage on test at depth 50.
+
 # 3. Introduction
-
-**TODO:** Mu
 ### 3.1 Motivation and the Depth Paradox
+There is a long standing intuition in convolutional neural networks that deeper networks should learn better. A deeper model occupies a larger hypothesis space, and classical capacity arguments (Goodfellow et al., Ch. 5; Bishop §1.1) suggest that the added layers should, in principle, allow a deeper network to approximate any function at least as well as its shallower counterpart. In practice, this intuition breaks down as stacking more layers on a plain convolutional network does not necessarily improve accuracy; beyond a certain depth, accuracy saturates or even degrades — not because the model is overfitting, but because training error itself rises with depth.
 
-- Reuse and expand the opening paragraph from the proposal's §1 ("The architectural evolution of convolutional neural networks…").
-- Cite Goodfellow Ch. 5 (capacity / representation) and Bishop §1.1 (hypothesis space) when stating that deeper ≠ strictly better.
-- Frame the **degradation problem** explicitly as distinct from overfitting: training error itself rises with depth in plain nets. Cite He et al. §1, Fig. 1.
+This problem is the depth-induced degradation documented in He et al. (2015, §1, Fig. 1). A 34-layer plain network trained on CIFAR-10 achieves higher training error than an 18-layer plain network trained under identical conditions. Batch normalization was applied to avoid vanishing gradient problem in both cases. Therefore, the degradation problem was not from overfitting or poor gradient propagation. Instead, the optimizer itself fails to utilize the full model capacity provided by the extra layers. Our own experiments reproduce this finding at depths {4, 32, 50}: the Plain network's training error rises from 0.13% at depth 4 to 20.84% at depth 50, confirming that depth alone was contributing to the performance bottleneck.
 
 ### 3.2 Residual Learning as the Established Fix
 
-- Reuse the proposal's §1 paragraph that introduces $H(x)$, $F(x) := H(x) - x$, $y = F(x) + x$.
-- Add textbook grounding: cite **Goodfellow §8.2.5** for the optimization-difficulty framing and **Bishop §5.3** for backpropagation through the additive shortcut.
-- One sentence on why the identity shortcut helps gradient flow: $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ — the "+1" guarantees a direct gradient path.
+He et al. (2015) proposed a way to preconditioning the network to make optimization easier. Instead of asking each stacked layer to learn the complete underlying mapping H(x) directly, we can reformulate the learning problem so that the layer learns the residual F(x)=H(x)−x. The block output is then y=F(x)+x. Here the identity term x is essentially a shorcut connection connecting a few stacked layer as a block. This allows a faster and easier optimization if the actual desired transformation is identity mapping. Pushing F(x) to 0 is much easier than pushing a non linear function to identity.
+
+The additive shortcut also has an immediate consequence for gradient flow: differentiating the loss \mathcal{L} with respect to the block input gives $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ where the "+1" term guarantees that a direct gradient path exists from any layer back to the input, regardless of the magnitude of $\partial F / \partial x$ (Goodfellow et al., §8.2.5; Bishop §5.3). Even if the residual branch saturates or its gradients vanish, the identity shortcut ensures the learning signal propagates back to early layers.
 
 ### 3.3 Contributions of This Work
 
-Bulleted list. Each bullet = one concrete deliverable:
+- A controlled study of Plain (no shortcut), Baseline (identity skip), Scaled (learnable per-channel scalar on the residual branch), and Gated (input-dependent sigmoid gate on the residual branch) routing strategies, trained at depths {4, 32, 50} on CIFAR-10 under a fixed optimizer protocol.
 
-1. A controlled, identical-protocol comparison of four residual routing strategies (Plain / Baseline / Scaled / Gated) at multiple depths.
-2. An empirical reproduction of the degradation problem at our implementation's depth scale.
-3. Layer-wise L2 gradient-norm diagnostics that visualize *how* each routing variant preserves (or fails to preserve) learning signal.
-4. An open-source reference implementation released at `github.com/muchensthughs/CMPE257_ResNet`.
+- Reproduction of the degradation problem at our implementation's depth scale, confirming that training error collapses in plain networks at depth 50.
+
+- Layer-wise L2 gradient-norm diagnostics that visualize how each routing variant preserves or fails to preserve learning signal across block depth.
+
+- An open-source reference implementation of all four variants, training scripts, configuration files, and training results, released at `github.com/muchensthughs/CMPE257_ResNet`.
 
 ### 3.4 Roadmap
 
-One short paragraph mapping sections to questions ("§4 states the questions, §5 reviews prior work, §6 describes the four solutions, §7–§8 detail experiments, §9 reports results, §10–§12 discuss conclusions, limitations, and next steps").
+The remainder of the paper is organized as follows. Section 4 formalizes the two research questions: reproduction of the degradation problem and comparison of residual variants — along with the success criteria used to evaluate them. Section 5 reviews the prior work that motivates the four variants. Section 6 defines the shared block structure and describes each routing variant in detail. Sections 7 and 8 enumerate the experimental grid and specify the dataset, macro-architecture, training protocol, and measurement procedure. Section 9 reports results for each variant and comparison between variants. Sections 10 through 12 present conclusions, limitations, and directions for future work.
 
 ---
 
