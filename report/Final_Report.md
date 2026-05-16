@@ -1,28 +1,20 @@
+# Final_Report
 # Exploring Residual Connection Variants in Modern CNN Architectures
 
-# 1. Title Page
+## CMPE 257, Machine Learning
+### Spring 2026
+### San José State University
 
-**TODO:** Napoleon
-
-- Title: *Exploring Residual Connection Variants in Modern CNN Architectures*
-- Authors: Emily Moberly, Mu Chen, Maximilian Garcia, Napoleon Salazar
+- Emily Moberly
+- Maximilian Garcia
+- Mu Chen
+- Napoleon Salazar
 
 ---
 
 # 2. Abstract
 
-**TODO:** Napoleon
-
-Must hit:
-
-- One-sentence motivation (degradation problem — depth alone does not buy accuracy in plain CNNs).
-- One-sentence framing of the four variants (Plain ablation, Baseline residual, Scaled `α·F(x)`, Gated `g(x)·F(x)`).
-- One-sentence experimental scope: CIFAR-10, depths **{4, 32, 50}** (note divergence from proposal's {4, 8}), 200 epochs, SGD + StepLR, no dropout — Batch Normalization is the only normalization-style regularizer.
-- 2–3 sentences of headline results: (a) does Plain degrade with depth? (b) do residual variants recover? (c) does Scaled/Gated beat Baseline, or is the simple identity skip enough?
-- One closing sentence on the broader implication (identity shortcuts are still hard to beat — anticipates ReZero / LayerScale / Highway lineage).
-
----
-
+The depth-induced degradation problem documents that increased depth alone does not guarantee higher accuracy in plain convolutional networks, motivating the residual learning paradigm of He et al. (2015). Four routing strategies were compared in this paper, namely a plain ablation with no shortcut, a Baseline residual with an identity skip, a Scaled variant with a learnable per-channel scalar on the residual branch, and a Gated variant with an input-dependent sigmoid gate on the residual branch. All four variants were trained on CIFAR-10 at depths {4, 32, 50} for 200 epochs with SGD and momentum, a StepLR schedule, and Batch Normalization as the only normalization-style regularizer. The Plain network degraded sharply with depth, with training error rising from 0.13% at depth 4 to 20.84% at depth 50, while the three residual variants reached essentially 100% training accuracy and above 93% validation accuracy at depths 32 and 50. Within the residual variants, Scaled was statistically indistinguishable from Baseline at every depth, and only the Gated variant outperformed Baseline by margins clearing single-seed noise, with a 0.46 percentage point advantage on validation and a 0.62 percentage point advantage on test at depth 50.
 # 3. Introduction
 
 **TODO:** Mu
@@ -314,22 +306,52 @@ At depth 8, with the flat 64-filter block defined in Section 6.1 (Shared Block S
 
 # 9. Results
 
-**TODO:** Napoleon
+Following the experimental protocol defined in Section 8 (Experiment Set-up and Data Set Details), the outcomes of the twelve runs in the experimental grid are reported here and evaluated against the two research questions of Section 4 (Problem Statement). Section 9.1 (Master Comparison Table) presents the aggregate validation and test-set numbers across the full grid. The subsequent subsections decompose those numbers per variant in Sections 9.2 through 9.5, examine the underlying gradient flow in Section 9.6 (Gradient Flow Analysis), compare all four variants directly at depth 50 in Section 9.7 (Cross-Variant Comparison), and report the parameter count and wall-clock cost of each variant in Section 9.8 (Computational Overhead).
 
 ### 9.1 Master Comparison Table
 
-**TODO:** Napoleon Salazar
-Single table — best validation accuracy and final-epoch training accuracy for all 4 variants × 3 depths = 12 cells (plus the d8_baseline footnote). Format suggestion:
+The headline accuracies for all twelve runs in the experimental grid are reported below.
 
 | Variant  | Depth 4 (val / train) | Depth 32 (val / train) | Depth 50 (val / train) |
-| -------- | --------------------- | ---------------------- | ---------------------- |
-| Plain    | … / …                 | … / …                  | … / …                  |
-| Baseline | … / …                 | … / …                  | … / …                  |
-| Scaled   | … / …                 | … / …                  | … / …                  |
-| Gated    | … / …                 | … / …                  | … / …                  |
+|----------|-----------------------|------------------------|------------------------|
+| Plain    | 90.44 / 99.87         | 90.42 / 99.77          | 76.54 / 79.16          |
+| Baseline | 90.38 / 99.86         | 93.44 / 100.00         | 93.16 / 100.00         |
+| Scaled   | 90.20 / 99.88         | 93.76 / 99.99          | 93.30 / 100.00         |
+| Gated    | 90.44 / 99.90         | 93.34 / 99.99          | 93.62 / 99.98          |
+The chart above represents the **best top-1 validation accuracy and final-epoch training accuracy** (percentages) for the twelve runs of the experimental grid. Each validation value is the maximum over 200 epochs, and each training value is the accuracy at epoch 200. The headline finding is the depth-50 Plain row validation accuracy collapses from 90.42% at depth 32 to 76.54% at depth 50, equivalent to a rise in validation error from 9.58% to 23.46%, and training accuracy collapses from 99.77% to 79.16% in lockstep. The simultaneous failure on both training and validation confirms that the degradation problem is reproduced as a training failure . In contrast, all three residual variants instead climb above 93% validation accuracy at depths 32 and 50, equivalent to validation errors between 6.24% and 6.84%, while holding their training accuracy at essentially 100%, which is the signature of the residual fix described by He et al. (2015).
 
-Below the table, a 2–3 sentence interpretation pointing the reader at the headline finding.
+Within the three residual variants, the central question is whether the more complex Scaled and Gated mechanisms improve on the simple identity skip of Baseline. At depths 4 and 32 every gap between Baseline, Scaled, and Gated is at most 0.32 percentage points of validation accuracy and falls inside the single-seed noise band of roughly ±0.2 to 0.3 percentage points, so none of those cells supports a defensible variant ranking. At depth 50, Gated reaches 93.62% validation accuracy against Baseline's 93.16%, a gap of 0.46 percentage points that is the only within-residual margin in the grid to clear that noise band. Scaled at depth 50 lands at 93.30%, only 0.14 percentage points above Baseline and well within noise. The depth-50 Gated cell is therefore the single point at which a more complex shortcut routing meaningfully outperforms the simple identity skip.
 
+The training and validation error trends are visualized in the four charts that follow. Each metric is shown both across all four variants and across the residual variants only.
+
+![Training error at epoch 200 by variant and depth](training_error_all_variants.png)
+**Training error at epoch 200 by variant and depth.** Plain's training error rises from 0.13% at depth 4 to 20.84% at depth 50, while the three residual variants remain at or below 0.23% across all three depths.
+
+![Training error at epoch 200 by depth, residual variants only](training_residual_variants.png)
+**Training error at epoch 200 by depth, residual variants only.** With Plain removed and the vertical axis tightened, Baseline, Scaled, and Gated all converge to essentially zero training error at depths 32 and 50, confirming none of them suffers any residual optimization failure.
+
+![Best-epoch validation error by variant and depth](validation_error_all_variants.png)
+**Best-epoch validation error by variant and depth.** Plain rises from 9.56% at depth 4 to 23.46% at depth 50, while the three residual variants drop from around 9.6% at depth 4 to between 6.24% and 6.84% at depths 32 and 50.
+
+![Best-epoch validation error by depth, residual variants only](validation_error_residual_variants.png)
+**Best-epoch validation error by depth, residual variants only.** With the axis zoomed to the 6.24% to 9.80% range, the small within-residual differences become readable. Scaled is lowest at depth 32 (6.24%), and Gated is lowest at depth 50 (6.38%).
+
+The validation findings reported above are corroborated against the held-out 10,000-image CIFAR-10 test set, using the best-validation checkpoint of each run.
+
+| Variant  | Depth 4 | Depth 32 | Depth 50 |
+|----------|---------|----------|----------|
+| Plain    | 89.37   | 89.52    | 75.16    |
+| Baseline | 89.59   | 93.02    | 92.20    |
+| Scaled   | 89.64   | 93.06    | 92.44    |
+| Gated    | 89.28   | 92.62    | 92.82    |
+**Test-set top-1 accuracy** (percentages) on the held-out 10,000-image CIFAR-10 test set, evaluated using the best-validation checkpoint of each run.
+
+The test-set numbers confirm the validation picture. Plain at depth 50 reaches only 75.16% on test, a drop of more than 14 percentage points from its depth-32 test accuracy of 89.52%, and the three residual variants instead remain above 92% test accuracy at depths 32 and 50. At depth 50 Gated reaches 92.82% on test against Baseline's 92.20%, a margin of 0.62 percentage points that is slightly larger than the corresponding validation margin of 0.46 percentage points and that confirms the depth-50 Gated cell as the only within-residual gap to clear single-seed noise on both metrics.
+
+The test accuracy of each variant at each depth is visualized below.
+
+![Test accuracy on CIFAR-10 by variant and depth, all variants](testing_accuracy_all_variants.png)
+**Test accuracy (Acc@1) on CIFAR-10 by variant and depth.** Plain's depth-50 bar drops to 75.16%, while the three residual variants remain above 92% at depths 32 and 50. Gated's depth-50 bar (92.82%) edges Baseline (92.20%) by 0.62 percentage points, the only within-residual cell to clear single-seed noise.
 ### 9.2 Reproducing the Degradation Problem (Plain Network)
 
 **TODO:** Mu
@@ -417,13 +439,23 @@ enough that the depth-50 result deserves the multi-seed follow-up evaluation.
 
 ### 9.7 Cross-Variant Comparison
 
-**TODO:** Napoleon
-- Single overlaid plot of validation accuracy at depth 50 for all four variants.
-- Answer **RQ1**: does each residual variant solve the degradation problem? (Tabular yes/no with margin.)
-- Answer **RQ2**: does Scaled or Gated beat Baseline?
-- Quote He et al.'s findings on identity vs. projection shortcuts for context:
+The per-variant analyses in the preceding subsections are consolidated here into a direct comparison at depth 50, where the four variants separate most clearly. The two research questions of Section 4 (Problem Statement) are addressed in turn against the depth-50 validation and test numbers.
 
-Our result is analogous: if Baseline ties or wins, we have an independent corroboration of "the simple identity skip is hard to beat."
+#### Does each residual variant solve the degradation problem?
+
+The margin over Plain at depth 50 is reported in the table below for both validation and test.
+
+| Variant  | Solves degradation? | Margin over Plain at depth 50 (val / test) |
+|----------|---------------------|--------------------------------------------|
+| Baseline | Yes                 | +16.62 pp / +17.04 pp                      |
+| Scaled   | Yes                 | +16.76 pp / +17.28 pp                      |
+| Gated    | Yes                 | +17.08 pp / +17.66 pp                      |
+
+All three residual variants clear the Plain network by more than 16 percentage points of validation accuracy and more than 17 percentage points of test accuracy at depth 50. Every margin is more than fifty times the single-seed noise band of ±0.2 to 0.3 percentage points, so the answer to RQ1 is unambiguous on this implementation.
+
+#### Do the more complex Scaled and Gated variants outperform Baseline?
+
+Gated provided a small but consistent improvement over Baseline on both validation and test at depth 50. Validation accuracy reached 93.62% against Baseline's 93.16%, and test accuracy reached 92.82% against Baseline's 92.20%, gaps of 0.46 and 0.62 percentage points that both clear the single-seed noise band of ±0.2 to 0.3 percentage points. Scaled's results were marginal against Baseline and are examined in Section 9.4 (Scaled Residual). Gated is therefore the only routing mechanism in the experimental grid that meaningfully outperforms the simple identity shortcut at the depths considered.
 
 ### 9.8 Computational Overhead
 
@@ -435,34 +467,26 @@ Our result is analogous: if Baseline ties or wins, we have an independent corrob
 
 # 10. Conclusions
 
-**TODO:** Napoleon
-**Target length:** 0.75 – 1 page
+The depth-induced degradation problem was reproduced in the Plain network, with training error rising from 0.13% at depth 4 to 20.84% at depth 50 and validation accuracy collapsing from 90.44% to 76.54% in parallel. The simultaneous failure on both training and validation matches the optimization-failure framing of He et al. (2015) and rules out overfitting as the cause.
 
-Three short paragraphs:
+In contrast, all three residual variants eliminated the degradation problem at every depth tested, with each reaching essentially 100% training accuracy and clearing the depth-50 Plain network by more than sixteen percentage points of validation accuracy. The fix is attributable to the additive identity path through the block, which preserves a direct gradient route to earlier layers (Goodfellow §8.2.5).
 
-1. **Degradation problem reproduced.** State whether plain networks at depth 50 underperformed plain at depth 4 on training error. Tie back to He et al. §1 and Fig. 1.
-2. **Residual variants solve it.** State whether Baseline, Scaled, Gated all eliminated degradation. Tie to Goodfellow §8.2.5.
-3. **The simple identity shortcut remains competitive.** State whether Scaled or Gated meaningfully beat Baseline. If not, explicitly draw the historical parallel: He et al. argued in 2015 that identity shortcuts dominate gated alternatives; our experiment at modest depth on CIFAR-10 corroborates / contradicts this.
+Among the residual variants, the simple identity shortcut of the Baseline variant remained competitive with the more elaborate Scaled and Gated alternatives. Scaled tied Baseline at every depth within single-seed noise on both validation and test. Gated produced a small but consistent improvement only at depth 50, with margins of 0.46 percentage points on validation and 0.62 percentage points on test that both clear the noise band.
 
-End with a single sentence answering RQ1 and RQ2 directly.
+In summary, the reproduction question of whether each residual variant solves the degradation problem is answered in the affirmative for all three. For the comparison question of whether the more complex Scaled and Gated variants outperform the simpler Baseline residual, Scaled was statistically indistinguishable from Baseline at every depth, and Gated outperformed Baseline by a small but consistent margin at depth 50.
 
 ---
 
 # 11. Limitations
 
-**TODO:** Napoleon
-**Target length:** 0.75 – 1 page
+The conclusions reported in Section 10 (Conclusions) rest on a deliberately narrow experimental scope. The limitations of that scope are listed below, both to qualify the strength of the present claims and to delimit which questions are left open for future work.
 
-Be honest. Bulleted limitations:
+- **Single dataset.** The study used only CIFAR-10. The variant ranking has not been validated on CIFAR-100, ImageNet, or any non-vision modality.
+- **Single seed per run.** Each run was trained with a single random seed (42). Without multiple seeds, accuracy gaps smaller than the ±0.2 to 0.3 percentage point single-seed noise band cannot be distinguished from seed variance, which limits the strength of within-residual claims.
+- **No dropout ablation.** Dropout was deliberately omitted from all runs to keep the routing-variable ablation clean (Section 6.1 (Shared Block Structure)). Whether adding dropout would change the within-residual ranking is not measured here.
+- **No state-of-the-art training tricks.** Cutout, mixup, label smoothing, stochastic depth, and test-time augmentation are all absent. The accuracy numbers reported here should not be compared against modern CIFAR-10 leaderboards.
 
-- **Single dataset.** Only CIFAR-10; not validated on CIFAR-100, ImageNet, or any non-vision modality.
-- **Single seed per run.** No error bars or confidence intervals — we cannot distinguish small accuracy gaps from seed noise.
-- **Flat 64-filter architecture.** No channel doubling at downsampling stages (unlike He et al.); our depths are not directly comparable to ResNet-50 in their paper.
-- **No bottleneck blocks.** All variants use 2-conv blocks; we do not know if our conclusions transfer to 3-conv bottleneck designs.
-- **Depth divergence from the proposal.** The proposal promised {4, 8}; we delivered {4, 32, 50}. The d8 run exists only for Baseline; the depth-8 axis of the originally promised study is incomplete.
-- **No dropout ablation.** We deliberately omitted dropout; we cannot say whether adding dropout would change the variant ranking.
-- **No state-of-the-art tricks.** No cutout, mixup, label smoothing, stochastic depth, or test-time augmentation. The accuracy numbers should not be compared against modern leaderboards.
-- **Limited interpretability of Gated.** The single sigmoid gate $g(x) = \sigma(Wx)$ is the simplest possible gating mechanism; more sophisticated gates (channel-wise, head-wise) were out of scope.
+Some of these limitations point toward a concrete follow-up that would tighten or extend the present findings. Those follow-ups are catalogued in Section 12 (Future Work).
 
 ---
 
