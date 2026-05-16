@@ -210,6 +210,8 @@ that is numerically close to the Baseline residual and lets the gate *learn* to
 close. The implementation lives in
 `models/blocks/gated.py`.
 
+![Gated Residual](gated_residual.png)
+
 #### 6.5.1 Gradient signal through the gate
 
 In the original Highway Networks (Srivastava et al., 2015), the shortcut path itself is multiplied by a learned carry gate. However, gating the skip connection introduces a critical risk. If the network drives the gate toward zero, the residual connection is disrupted. This effectively reverts the model back into a plain sequential network, reviving the gradient problems previously described. He et al. (2015) explicitly flagged this vulnerability, demonstrating that gated shortcuts underperform plain identity skips because they cannot guarantee an unobstructed gradient path to earlier layers.To resolve this, our Gated variant avoids this failure mode by shifting where the gate is applied. Instead of gating the shortcut, our architecture applies the gate exclusively to the residual branch ($F(x)$), leaving the identity shortcut ($x$) completely unhindered. Because the shortcut remains purely additive, the gradient flow is mathematically preserved. Differentiating this output with respect to the block input yields
@@ -218,8 +220,6 @@ $$
 \;+\; F(x)\,\frac{\partial g}{\partial x},
 $$
 As shown, the identity matrix $I$ ensures that even if the gate $g(x)$ saturates and attenuates the residual updates, a clean gradient path always remains open to propagate backward to earlier layers.
-
-![Gated Residual](gated_residual.png)
 
 
 ### 6.6 Why These Four Variants Form a Clean Ablation
@@ -378,8 +378,15 @@ Below the table, a 2–3 sentence interpretation pointing the reader at the head
 
 This subsection reports the Gated variant's training and validation behavior at
 all three depths, the dynamics of the learned gate $g(x)$ over training, and a
-head-to-head comparison against the Baseline residual that bears directly on
-He et al. §2's claim that gated shortcuts are inferior to identity shortcuts.
+head-to-head comparison against the Baseline residual.
+
+**Baseline network vs Gated network vs Plain Network.** Top 100 epochs
+
+![Training](training_validation_errors.png)
+
+**Baseline network vs Gated network.** Top 100 epochs validation error
+
+![Validation](validation_100_epochs.png)
 
 **Headline numbers.** Best top-1 validation accuracy from `runs/d{4,32,50}_gated/metrics_epoch.csv`:
 
@@ -389,33 +396,21 @@ He et al. §2's claim that gated shortcuts are inferior to identity shortcuts.
 | 32    | 93.34 % (ep 106) | 93.44 % (ep 180)    | 90.42 % (ep 125) | **−0.10**           |
 | 50    | 93.62 % (ep 143) | 93.16 % (ep 119)    | 76.54 % (ep 197) | **+0.46**           |
 
-Three observations follow directly:
+Based on these metrics, the following observations can be made:
 
-1. **Gated solves the degradation problem.** At depth 50, the Plain network
+1. **Gated solves the degradation problem:** At depth 50, the Plain network
    collapses to 76.54 % validation accuracy — a 14 + point drop from depth 32 —
    while the Gated network climbs to 93.62 %, its best result across all three
    depths. The shape of the curve is essentially identical to Baseline: a sharp
    initial rise, a plateau, and a step-up at the LR decay points (epochs 100 and
-   150). The "+1" in $\partial y / \partial x = I + g(x)\,\partial F / \partial x + F(x)\,\partial g / \partial x$
-   (§6.5) is doing its job — the protected identity skip is sufficient to keep
-   gradient flow healthy even when the gate is free to attenuate $F(x)$.
-2. **Gated is competitive with Baseline.** The gap between Gated and Baseline is
-   below half a percentage point at every depth, well within the single-seed
-   noise margin we call out in §11. At depth 50 Gated edges Baseline (+0.46 pp);
-   at depths 4 and 32 the two are statistically indistinguishable. Crucially,
-   Gated never *underperforms* Baseline by a meaningful margin — there is no
-   evidence here of the Highway-style collapse He et al. §2 warned about. We
-   attribute this to the design choice in §6.5: the identity skip is preserved
-   *outside* the gate, so even if the optimizer drives $g(x) \to 0$ in a block,
-   the shortcut never closes.
-3. **The cost is real but small.** Each Gated block adds $C^2 + C = 4{,}160$
+   150). Therefore, the protected identity skip is sufficient to keep
+   gradient flow healthy.
+2. **The cost is real but small:** Each Gated block adds $C^2 + C = 4{,}160$
    parameters and one $1\!\times\!1$ convolution per forward pass. For the
    depth-50 variant this is on the order of $10^5$ additional parameters and a
    ~1–2 % wall-clock overhead per epoch relative to Baseline (full table in
-   §9.8). Whether that overhead is worth the +0.46 pp at depth 50 is a
-   single-seed result and we discuss it cautiously below.
-
-**Training curves.** Across all three depths the Gated training accuracy
+   §9.8).
+3. **Training curves:** Across all three depths the Gated training accuracy
 reaches the same near-100 % asymptote as Baseline within the first 50 epochs
 and then sits flat; the validation curve hits its plateau shortly after the
 first LR decay (epoch 100) and improves only marginally after the second
@@ -423,39 +418,18 @@ decay (epoch 150). The Gated best-validation epoch is **d4 at epoch 112**,
 **d32 at epoch 106**, and **d50 at epoch 143** — all three sit between the
 two LR decays (epochs 100 and 150), the post-first-decay window where
 Baseline also peaks.
-
-**Comparison against the Baseline residual.** Gated equals or beats Baseline
+4. **Validation Curves:** Gated equals or beats Baseline
 on best-epoch validation accuracy at every depth: **+0.06 pp at d4**,
 **−0.10 pp at d32**, and **+0.46 pp at d50**. The d4 and d32 gaps fall
-inside the ±0.2–0.3 pp single-seed CIFAR-10 noise band (§11) and should be
+inside the ±0.2–0.3 pp noise band and should be
 read as ties; the d50 +0.46 pp is the only Gated-vs-Baseline gap that
 clears that noise floor and is therefore the cell where Gated's advantage is
 most defensible. Averaged across the three depths, Gated improves best-epoch
 validation accuracy by +0.14 pp over Baseline (92.47 % vs. 92.33 %) for an
 additional ~0.5 % parameter count and one $1\!\times\!1$ convolution per
 forward pass (§9.8). This is a small but consistent edge — not strong enough
-on a single seed to recommend Gated over Baseline as a default, but strong
-enough that the depth-50 result deserves the multi-seed follow-up called out
-in §12.
-
-**Gate dynamics.** The argument in §6.5 that motivated this variant — a
-residual-branch gate on top of a preserved identity skip — is a *structural*
-claim about the update rule. The forward equation $y = x + g(x)\,F(x)$
-guarantees that
-$\partial y/\partial x \;=\; I \;+\; g(x)\,\partial F/\partial x \;+\; F(x)\,\partial g/\partial x$
-contains an unmodulated identity term regardless of what $g(x)$ learns, so the
-gradient pathway that motivates the Baseline residual is intact in every Gated
-block by construction. An *empirical* per-block $\bar g(x)$ analysis (early
-blocks vs. late blocks, whether any block drives the gate toward zero, how
-the gate distribution evolves through training) would meaningfully add to
-this and would let us claim, rather than assume, that the trained network
-chooses to *damp* rather than *suppress* the residual branch. That analysis
-is not present in the current iteration: the trainer (`training/trainer.py`)
-records per-layer gradient norms and accuracy but does not snapshot
-$\bar g(x)$ or $\alpha$ during training, and no post-hoc gate-statistics
-artifact exists in `runs/d*_gated/`. We treat the gate-dynamics study as a
-follow-up captured in §12 and do not make claims about gate values in this
-draft.
+on to recommend Gated over Baseline as a default, but strong
+enough that the depth-50 result deserves the multi-seed follow-up evaluation.
 
 ### 9.6 Gradient Flow Analysis
 
@@ -517,85 +491,27 @@ Be honest. Bulleted limitations:
 
 # 12. Future Work
 
-The four-variant ablation in this paper is deliberately narrow: a single
+The four-variant ablation in this paper is limited in scope. A single
 dataset, a single seed per cell, a fixed flat-64 macro-architecture, and three
-depths. Each of the following directions removes one of those restrictions and
-turns one of §11's limitations into a tractable follow-up study. They are
-ordered roughly by cost — the first three are inexpensive enough that a
-follow-on team could complete them within a semester, while the last three are
-paper-sized contributions in their own right.
+depths are not enough to paint the full picture. Each of the following directions removes one of those restrictions and
+turns these limitations into prospective follow-up studies.
 
 - **Multi-seed runs with confidence intervals.** The single most defensible
-  next step. The closest two cells in our headline results — Gated vs. Baseline
-  at depth 50 — differ by only 0.46 percentage points (§9.5), well within the
-  seed-to-seed noise band typically reported for CIFAR-10 ResNets ($\pm$0.2–0.5
-  pp). Rerunning all 12 cells with five seeds and reporting mean $\pm$ standard
+  next step. Rerunning all experiments with at least five seeds and reporting mean $\pm$ standard
   error would let us state whether the depth-50 Gated advantage is real or an
-  artifact of the single seed used here. This is also the only follow-up that
-  can *retroactively* sharpen every claim in §9.
+  artifact of the single seed used here.
 
 - **Cross-dataset validation.** Repeat the full ablation on CIFAR-100 and
   Tiny-ImageNet, holding the architecture and training protocol fixed. CIFAR-100
   shares CIFAR-10's image distribution but is harder per-class; Tiny-ImageNet
   introduces 64$\times$64 inputs and 200 classes. If the variant ranking is
-  consistent across all three datasets, we have a stronger generalization
-  claim; if it flips (e.g., Gated wins on CIFAR-100 but loses on Tiny-ImageNet),
-  the per-block gate visualization from §9.5 becomes the analytical lever for
-  explaining *why*.
+  consistent across all three datasets, then there's a stronger generalization
+  claim.
 
-- **Logging gate and scalar trajectories as a first-class metric.** §9.5
-  deferred the per-block $\bar g(x)$ analysis because the trainer
-  (`training/trainer.py`) does not currently snapshot the Gated or Scaled
-  variants' routing parameters during training, and no post-hoc
-  gate-statistics artifact exists in `runs/d*_gated/`. Adding a per-epoch
-  hook that records $\bar g_i$ and $\alpha_i$ alongside the gradient norms in
-  `runs/<run>/gradient_norms.csv` would make the gate-dynamics analysis
-  reproducible without rerunning the model, and would let future work plot
-  the *trajectory* of openness — not just the endpoint — and answer the
-  questions §9.5 left open (which blocks damp the most, does any block drive
-  $\bar g \to 0$, how does the gate distribution evolve through training).
-
-- **Channel-wise and head-wise gating.** Our Gated variant uses a single
-  per-channel scalar gate $g(x)$ that depends on the entire input channel
-  vector via a $1{\times}1$ convolution. Two intermediate steps toward
-  full-attention routing are natural follow-ups: (a) a *channel-wise* gate that
-  uses depth-wise $1{\times}1$ convolutions so each channel of $F(x)$ is gated
-  by the corresponding channel of $x$ (closer to LayerScale, Touvron et al.
-  2021); and (b) a *head-wise* gate that splits $F(x)$ into $K$ heads and learns
-  $K$ scalar gates per block (closer to multi-head attention, Vaswani et al.
-  2017 §3.2). Comparing these two against our current full $1{\times}1$ gate
-  isolates the contribution of (i) parameter count, (ii) spatial coupling, and
-  (iii) head-level routing — exactly the three knobs that distinguish modern
-  ViT-style residual variants from classical ResNets.
-
-- **Comparison against ReZero and LayerScale at matched parameter count.** The
-  Scaled variant (§6.4) can be reinterpreted as ReZero (Bachlechner et al.,
-  2020) if $\alpha$ is initialized to $0$ instead of $1$, and as LayerScale
-  (Touvron et al., 2021) if $\alpha$ is per-channel. Running these as two
-  additional variant cells in the same grid would let us answer a specific,
-  testable question: at the modest depths we study, does the *initialization*
-  of the residual scalar matter more than the scalar's *parameterization*? This
-  is a direct test of the architectural folklore that "$\alpha = 0$ initialization
-  is essential for very deep networks" against the controlled small-depth
-  regime where the claim is most often invoked but least often verified.
-
-- **Stochastic depth combined with Gated.** Stochastic depth (Huang et al.,
-  2016) drops entire residual blocks with probability $p$ during training; it is
-  residual-specific and acts as both a regularizer and a depth-curriculum.
-  Combining it with the Gated variant produces a clean ablation: stochastic
-  depth provides a hard, training-time-only "gate" ($g \in \{0, 1\}$ randomly),
-  while our Gated variant provides a soft, learned, test-time gate ($g \in (0,
-  1)$). The interaction is interesting precisely because both are gating
-  mechanisms with very different statistical properties, and the combination
-  may either reinforce (regularization + adaptive routing) or cancel
-  (closing-via-randomness on top of closing-via-learning).
-
-- **Extension to extreme depths (110 / 1202 layers).** He et al.'s §4.2 found
-  that the gap between residual variants opens dramatically at depth $\geq$ 110
-  on CIFAR-10. Our depth ladder (4 / 32 / 50) sits below that regime and may be
+- **Extension to extreme depths (110 / 1202 layers):** Our depth ladder (4 / 32 / 50) sits below the original Resnet 2015 depth regime and may be
   systematically *under-resolving* the Scaled and Gated advantages. Repeating
   at depths 110 and 1202 would either replicate He et al.'s headline finding
-  (with our four-variant lens) or — if Plain still does not collapse further —
+  (with our four-variant lens) or
   suggest that BatchNorm plus the flat-64 macro-architecture has its own
   upper-depth ceiling distinct from the residual mechanism. Either outcome is
   publishable.
