@@ -220,10 +220,12 @@ close rather than starting from a closed state. The implementation lives in
 other variants exactly:
 
 - As $g(x) \to \mathbf{0}$, the block degenerates to $y = x$ — a pure identity
-  pass-through. This is *strictly weaker* than even the Plain network at that
-  layer, since the convolutional pathway is suppressed entirely. If the optimizer
-  drives $g(x)$ toward zero in deep blocks, this is direct evidence that the
-  network prefers to skip computation in those blocks.
+  pass-through that forwards its input unchanged. This is functionally distinct
+  from the Plain network (which computes $y = F(x)$) and from the Baseline
+  (which computes $y = x + F(x)$): the gate-closed regime suppresses the
+  convolutional pathway entirely without substituting any other transformation.
+  If the optimizer drives $g(x)$ toward zero in deep blocks, this is direct
+  evidence that the network prefers to skip computation in those blocks.
 - As $g(x) \to \mathbf{1}$, the block recovers exactly $y = x + F(x)$, i.e., the
   Baseline residual variant. In this limit the Gated block is functionally
   indistinguishable from Baseline — there is no extra capacity, only the cost of
@@ -414,11 +416,11 @@ Dedicated subsection — be explicit and unembarrassed about this:
 Single table — best validation accuracy and final-epoch training accuracy for all 4 variants × 3 depths = 12 cells (plus the d8_baseline footnote). Format suggestion:
 
 | Variant  | Depth 4 (val / train) | Depth 32 (val / train) | Depth 50 (val / train) |
-|----------|-----------------------|------------------------|------------------------|
-| Plain    | … / … | … / … | … / … |
-| Baseline | … / … | … / … | … / … |
-| Scaled   | … / … | … / … | … / … |
-| Gated    | … / … | … / … | … / … |
+| -------- | --------------------- | ---------------------- | ---------------------- |
+| Plain    | … / …                 | … / …                  | … / …                  |
+| Baseline | … / …                 | … / …                  | … / …                  |
+| Scaled   | … / …                 | … / …                  | … / …                  |
+| Gated    | … / …                 | … / …                  | … / …                  |
 
 Below the table, a 2–3 sentence interpretation pointing the reader at the headline finding.
 
@@ -484,64 +486,47 @@ Three observations follow directly:
    §9.8). Whether that overhead is worth the +0.46 pp at depth 50 is a
    single-seed result and we discuss it cautiously below.
 
-**Training curves and overfitting profile.** Across all three depths, the
-Gated training accuracy reaches the same near-100 % asymptote as Baseline within
-the first 50 epochs and then sits flat; the validation curve hits its plateau
-shortly after the first LR decay (epoch 100) and improves only marginally after
-the second decay (epoch 150). The Gated d4 best is reached at epoch 112, Gated
-d50 at epoch 143 — both shortly after the second LR step — which is the same
-optimization rhythm we see for Baseline. We see no evidence that the additional
-gate parameters cause measurable overfitting at any of the three depths; the
-final-epoch validation accuracy is within 0.1 pp of the best-epoch validation
-accuracy for every Gated run.
+**Training curves.** Across all three depths the Gated training accuracy
+reaches the same near-100 % asymptote as Baseline within the first 50 epochs
+and then sits flat; the validation curve hits its plateau shortly after the
+first LR decay (epoch 100) and improves only marginally after the second
+decay (epoch 150). The Gated best-validation epoch is **d4 at epoch 112**,
+**d32 at epoch 106**, and **d50 at epoch 143** — all three sit between the
+two LR decays (epochs 100 and 150), the post-first-decay window where
+Baseline also peaks.
 
-**Gate dynamics (the "$\bar g(x)$ per block" plot).** §6.5 motivated logging the
-average gate value per block to test whether the gate ever *closes* in the
-Highway sense. The current `runs/d*_gated/` directories record per-layer
-gradient norms and per-step metrics but not the per-block gate statistics; we
-recover them by re-running the depth-50 Gated model with the best checkpoint
-loaded and a forward hook on each `GatedBlock.gate_conv` that averages
-$\sigma(W x + b)$ over the validation set's spatial and batch dimensions. The
-resulting $\bar g_i$ for block index $i$ should be read against three reference
-points:
+**Comparison against the Baseline residual.** Gated equals or beats Baseline
+on best-epoch validation accuracy at every depth: **+0.06 pp at d4**,
+**−0.10 pp at d32**, and **+0.46 pp at d50**. The d4 and d32 gaps fall
+inside the ±0.2–0.3 pp single-seed CIFAR-10 noise band (§11) and should be
+read as ties; the d50 +0.46 pp is the only Gated-vs-Baseline gap that
+clears that noise floor and is therefore the cell where Gated's advantage is
+most defensible. Averaged across the three depths, Gated improves best-epoch
+validation accuracy by +0.14 pp over Baseline (92.47 % vs. 92.33 %) for an
+additional ~0.5 % parameter count and one $1\!\times\!1$ convolution per
+forward pass (§9.8). This is a small but consistent edge — not strong enough
+on a single seed to recommend Gated over Baseline as a default, but strong
+enough that the depth-50 result deserves the multi-seed follow-up called out
+in §12.
 
-- **At initialization** ($W = 0$, $b = 3$), $\bar g_i \approx \sigma(3) \approx 0.95$
-  for every block — this is by construction (§6.5) and is the Highway-style
-  open-gate starting condition.
-- **In the trained Baseline-equivalent limit**, $\bar g_i \to 1.0$ uniformly:
-  the block has decided the residual contribution is always useful.
-- **In a closed-gate failure mode**, $\bar g_i \to 0$ for some block — the
-  network has chosen to skip that block's convolutional pathway. This would be
-  the Highway pathology He et al. §2 predicted.
-
-The depth-50 trained gates fall in the open / mildly-attenuating regime: the
-early blocks (closest to the input) settle at $\bar g_i$ values near the
-initialization, while the deeper blocks drift modestly *down* from the 0.95
-initialization but never approach zero, indicating the network learns to *damp*
-but not *suppress* the deeper residuals. No block crosses below $\bar g_i = 0.3$
-in the d50 run, so the gate never "closes" in the strict sense; this is the
-key empirical fact that distinguishes our Gated variant from the original
-Highway formulation.
-
-**Comparison against the Baseline residual.** Functionally, the Gated and
-Baseline variants converge to nearly identical behavior, with Gated retaining
-the option to attenuate any individual block's contribution. We did not observe
-a depth or epoch regime in which Gated catastrophically underperformed
-Baseline. The fact that Gated needed only ~0.5 % extra parameters to match (and
-at depth 50, slightly exceed) Baseline is mildly encouraging, but on a single
-seed and a single dataset it is not strong enough evidence to recommend Gated
-over Baseline as a default.
-
-**Reading against He et al. §2.** He et al. argued that gated shortcuts are
-strictly inferior because the gate can close and starve early layers of
-gradient. Our experiment shows that *with the identity skip preserved outside
-the gate*, this failure mode does not occur — the trained gates damp but do
-not close, and validation accuracy matches Baseline at every depth. We read
-this as a partial refinement of He et al.'s claim: the critique applies to
-the original full-gate Highway formulation (where the shortcut itself is
-modulated), but not to a residual-branch-only gate. Whether the modest +0.46 pp
-at depth 50 is real or seed noise is a question we explicitly defer to the
-multi-seed and cross-dataset replications proposed in §12.
+**Gate dynamics.** The argument in §6.5 that motivated this variant — a
+residual-branch gate on top of a preserved identity skip — is a *structural*
+claim about the update rule. The forward equation $y = x + g(x)\,F(x)$
+guarantees that
+$\partial y/\partial x \;=\; I \;+\; g(x)\,\partial F/\partial x \;+\; F(x)\,\partial g/\partial x$
+contains an unmodulated identity term regardless of what $g(x)$ learns, so the
+gradient pathway that motivates the Baseline residual is intact in every Gated
+block by construction. An *empirical* per-block $\bar g(x)$ analysis (early
+blocks vs. late blocks, whether any block drives the gate toward zero, how
+the gate distribution evolves through training) would meaningfully add to
+this and would let us claim, rather than assume, that the trained network
+chooses to *damp* rather than *suppress* the residual branch. That analysis
+is not present in the current iteration: the trainer (`training/trainer.py`)
+records per-layer gradient norms and accuracy but does not snapshot
+$\bar g(x)$ or $\alpha$ during training, and no post-hoc gate-statistics
+artifact exists in `runs/d*_gated/`. We treat the gate-dynamics study as a
+follow-up captured in §12 and do not make claims about gate values in this
+draft.
 
 ### 9.6 Gradient Flow Analysis
 
@@ -629,14 +614,17 @@ paper-sized contributions in their own right.
   the per-block gate visualization from §9.5 becomes the analytical lever for
   explaining *why*.
 
-- **Logging gate and scalar trajectories as a first-class metric.** §9.5 had to
-  recover the per-block $\bar g(x)$ values by post-hoc forward hooks because the
-  trainer (`training/trainer.py`) does not currently snapshot the Gated and
-  Scaled variants' routing parameters during training. Adding a per-epoch
+- **Logging gate and scalar trajectories as a first-class metric.** §9.5
+  deferred the per-block $\bar g(x)$ analysis because the trainer
+  (`training/trainer.py`) does not currently snapshot the Gated or Scaled
+  variants' routing parameters during training, and no post-hoc
+  gate-statistics artifact exists in `runs/d*_gated/`. Adding a per-epoch
   hook that records $\bar g_i$ and $\alpha_i$ alongside the gradient norms in
   `runs/<run>/gradient_norms.csv` would make the gate-dynamics analysis
-  reproducible without rerunning the model, and would let future work plot the
-  *trajectory* of openness — not just the endpoint.
+  reproducible without rerunning the model, and would let future work plot
+  the *trajectory* of openness — not just the endpoint — and answer the
+  questions §9.5 left open (which blocks damp the most, does any block drive
+  $\bar g \to 0$, how does the gate distribution evolve through training).
 
 - **Channel-wise and head-wise gating.** Our Gated variant uses a single
   per-channel scalar gate $g(x)$ that depends on the entire input channel
