@@ -294,22 +294,18 @@ At depth 8, with the flat 64-filter block defined in Section 6.1 (Shared Block S
 
 ### 8.6 Implementation Details and Reproducibility
 
-**TODO:** Mu Chen
-- Framework: PyTorch (specify version from `requirements.txt` or `venv`).
-- Hardware: (fill in — GPU model, number of GPUs).
-- Random seeds: fixed for all runs (specify value).
-- Wall-clock training time per run (optional but valuable for the Limitations discussion).
+All experiments were implemented in PyTorch using torchvision for the CIFAR-10 dataset and transforms. Training was run on A100 with a single GPU per run.
+
+Reproducibility is enforced at several levels. Every experiment config fixes the random module seed as 42, which is applied before any model construction or data loading. The 90/10 train/validation split is generated with a fixed NumPy seed 42 and a deterministic shuffle, so the same 5,000 images form the validation set across all experiments. In addition, all model weights are initialized with deterministic schemes — Kaiming normal (He et al., 2015) for Conv2d layers, constant 1 and 0 for BatchNorm, and the routing-specific initializations ($\alpha = 1$ for Scaled, W=0 and b=3 for the Gated gate).
 
 ### 8.7 Code and Repositories
 
-**TODO:** Mu
 - Primary repo: `https://github.com/muchensthughs/CMPE257_ResNet`
 - Original prototyping notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
-- Open-source code utilized:
-  - PyTorch (BSD-3) — model, optimizer, dataloaders
-  - torchvision (BSD-3) — CIFAR-10 dataset and transforms
-  - (List any other dependencies from `requirements.txt`)
-- One-sentence statement that all training scripts, configs, and result CSVs/plots used in this report are committed to the repo for reproducibility.
+
+The implementation depends on two external libraries. PyTorch provides the model, optimizer, scheduler, and training loop. Torchvision provides the CIFAR-10 dataset and image transforms. NumPy is used for the deterministic train/validation split, and PyYAML for config loading. The code base is original to this project.
+
+All training scripts, config files, and the result CSVs and plots used in this report are committed to the repository. All experiment runs can be reproduced by checking out the repo and invoking the corresponding config. 
 
 ---
 
@@ -530,7 +526,7 @@ turns these limitations into prospective follow-up studies.
 
 # 13. References
 
-**TODO:** Mu + all members (verify their cited works)
+**TODO:** all members (verify their cited works)
 **Target length:** 1 – 1.5 pages
 
 Start from the proposal's bibliography (Refs [1]–[10]). **Additions required:**
