@@ -55,29 +55,14 @@ One short paragraph mapping sections to questions ("§4 states the questions, §
 
 # 4. Problem Statement
 
-**TODO:** Napoleon
-### 4.1 Research Questions
+Section 3 (Introduction) introduced residual learning as the established fix to the depth-induced degradation problem and identified the four routing variants studied here. The problem this paper takes up is whether the *form* of the residual shortcut matters in practice, and if so, by how much. That question decomposes into two parts. **RQ1 (Reproduction)** asks how well each residual variant solves the degradation problem compared to a plain (no-skip) network of the same depth, when trained under an identical protocol. **RQ2 (Comparison)** asks whether the more complex Scaled and Gated variants outperform the simpler Baseline residual, or whether the simple identity shortcut proves sufficient on this benchmark. RQ1 is a reproduction question whose positive answer is corroborative rather than novel; RQ2 is the comparative question, since the literature offers competing intuitions about whether richer shortcut-routing mechanisms repay their parameter overhead at the depths considered here.
 
-Reuse the proposal's §2 wording verbatim, but tighten the framing:
+### 4.1 Success Criteria
 
-- **RQ1 (Reproduction):** How well does each residual variant solve the degradation problem compared to a plain (no-skip) network?
-- **RQ2 (Comparison):** Do the more complex Scaled and Gated variants outperform the simpler Baseline identity skip connection?
+Two predictions are defined in advance to discipline the interpretation of results.
 
-### 4.2 Scope and Non-Goals
-
-State what this paper does **not** attempt:
-
-- Not pursuing state-of-the-art CIFAR-10 accuracy (no cutout, no mixup, no test-time augmentation).
-- Not exploring bottleneck blocks; all variants use the proposal's flat 64-filter two-conv block.
-- Not exploring depths > 50 layers; we deliberately stay at depths where the degradation problem can be isolated, not at the 1000-layer regime explored in He et al. §4.2.
-
-### 4.3 Success Criteria
-
-Explicit, measurable:
-
-- Plain network: validation accuracy strictly decreases as depth grows from 4 → 50.
-- All three residual variants: validation accuracy is non-decreasing (within seed noise) as depth grows.
-- Gradient norms in plain-50 at early layers measurably smaller than in any residual variant at the same layer index.
+1. **Plain degrades with depth.** Validation accuracy of the Plain network is non-increasing as depth grows from 4 to 50, with a measurable collapse at the deepest setting.
+2. **Residual variants recover.** Validation accuracy of the Baseline, Scaled, and Gated variants is non-decreasing across the same depth range, up to single-seed noise on the order of $\pm 0.2$–$0.3$ percentage points.
 
 ---
 
@@ -133,10 +118,21 @@ Reuse the proposal's §3 structure (it already has seven well-organized subsecti
 
 ### 6.1 Shared Block Structure (Reused Across All Four Variants)
 
-**TODO:** Napoleon Mu
-- Reuse proposal §6.2.1 block-level structure verbatim.
-- Diagram: include the shared conceptual block figure from the proposal (Fig. 5).
-- One sentence stating the **no-dropout decision** explicitly here, with the rationale: BatchNorm + augmentation are the only regularizers; this preserves a single-variable ablation across the four routing schemes. Cite Goodfellow §7.12 (dropout) for the omission rationale and §8.7.1 (BN) for what replaces it.
+Every block in every variant, at every depth, is constructed from the same convolutional pathway $F(x)$. This pathway is defined once in `models/blocks/base.py` and inherited by all four variant subclasses, so that any observed difference between Plain, Baseline, Scaled, and Gated is attributable to the shortcut-routing function alone.
+
+The shared pathway consists of two $3 \times 3$ convolutional layers, each with 64 output channels, stride 1, and padding 1, so the spatial dimensions of the input are preserved through the block. Each convolution is followed by Batch Normalization, a ReLU activation is applied between the two BN-Conv stages, and a final ReLU is applied to the output of the block after the shortcut has been combined with $F(x)$. The convolution layers carry no bias term, since biases are omitted from the convolutional layers as they are naturally absorbed by the subsequent BatchNorm parameters. Concretely :
+
+$$
+F(x) \;=\; \text{BN}\!\big(\text{Conv}_{3\times3,\,64}\big(\text{ReLU}\!\big(\text{BN}(\text{Conv}_{3\times3,\,64}(x))\big)\big)\big), \qquad y \;=\; \text{ReLU}\!\big(s(F(x),\,x)\big),
+$$
+
+where $s(\cdot,\cdot)$ is the variant-specific shortcut function defined in Section 6.2 (Plain Network) through Section 6.5 (Gated Residual). Figure 1 illustrates the shared pathway together with the four variant routings.
+
+![Shared block structure across all four variants](Shared_Conceptual_Block.png)
+
+**Shared block structure** (`Shared_Conceptual_Block.png`). The convolutional pathway $F(x)$ is identical across Plain, Baseline, Scaled, and Gated; only the shortcut routing $s(\cdot,\cdot)$ differs.
+
+No dropout is applied at any point inside the block, neither between the two convolutions nor after the shortcut combination. The only normalization-style regularizers active in this architecture are Batch Normalization on each $F(x)$ pathway (Goodfellow §8.7.1) and the random-crop and horizontal-flip data augmentation described in Section 8 (Experiment Set-up and Data Set Details).
 
 ### 6.2 Variant 1 — Plain Network (Ablation)
 
@@ -195,34 +191,51 @@ As shown, the identity matrix $I$ ensures that even if the gate $g(x)$ saturates
 
 ### 6.6 Why These Four Variants Form a Clean Ablation
 
-**TODO:** Napoleon
-- Short subsection (≤ 0.5 page). Argue that the four variants form a strict capability ordering of the **shortcut path**: nothing (Plain) → identity (Baseline) → identity + scalar (Scaled) → identity + input-dependent gate (Gated). The convolutional pathway $F(x)$ is held fixed. Therefore any observed difference is attributable to shortcut routing alone.
+The empirical comparisons reported in Section 9 (Results) rest on the methodological commitment that the four variants studied here differ along exactly one axis. This subsection makes that axis explicit. Across Plain, Baseline, Scaled, and Gated, the convolutional pathway $F(x)$, the block depth, the filter width, the BatchNorm placement, the optimizer, the learning-rate schedule, the random seed, and the augmentation pipeline are all held identical, as detailed in Section 6.1 (Shared Block Structure) and Section 8 (Experiment Set-up and Data Set Details). The only quantity that varies is how $F(x)$ is recombined with the block input $x$ on its way to the block output $y$.
+
+The four variants form a strict capability ordering of that recombination function.
+
+- **Plain.** $y = F(x)$. No shortcut; the residual branch is the only output.
+- **Baseline.** $y = x + F(x)$. Identity shortcut, full-strength residual, no learnable routing parameters.
+- **Scaled.** $y = x + \alpha \odot F(x)$, $\alpha \in \mathbb{R}^{C}$. Identity shortcut plus a learnable per-channel scalar on the residual.
+- **Gated.** $y = x + g(x) \odot F(x)$, $g(x) = \sigma(Wx + b) \in (0,1)^{C \times H \times W}$. Identity shortcut plus a learnable input-dependent per-channel, per-spatial gate on the residual.
+
+Each residual variant nests the previous one inside a richer parameter family. Scaled reproduces Baseline exactly when $\alpha = \mathbf{1}$, and Gated reproduces a constant-$\alpha$ Scaled block when its weight matrix $W$ is zero. The initial values are chosen so this nesting also holds numerically at step 0, with $\alpha$ initialized to $\mathbf{1}$ in Scaled and the gate bias $b$ initialized to $3$ in Gated to give $g(x) \approx 0.95$ on the first batch, so all three residual variants begin training with outputs within roughly five percent of Baseline. Any later divergence therefore reflects what the additional routing parameters have learned, not differences in starting state.
+
+Because $F(x)$ is held fixed across the four variants, any observed difference in validation accuracy or gradient flow can be attributed to the shortcut-routing function alone. The Plain ablation isolates the contribution of having any shortcut at all, and the Baseline → Scaled → Gated progression isolates the contribution of giving that shortcut increasingly expressive learnable modulation of the residual branch. The remainder of the paper exploits this attribution.
 
 ---
 
 # 7. List of Experiments
 
-**TODO:** Napoleon
-
-Short, table-driven section. The reader should be able to glance at this and know exactly what was run.
+This section enumerates the training runs whose results are reported in Section 9 (Results). The experimental grid spans the four routing variants defined in Section 6 (Solution) across three depths, all trained under the protocol specified in Section 8 (Experiment Set-up and Data Set Details).
 
 ### 7.1 Experimental Grid
 
+Each row corresponds to one training run. The 12-cell grid is the basis of every comparison reported in Section 9 (Results).
+
 | Run ID | Variant | Depth (layers) | Seed | Epochs | Config file |
 |--------|---------|----------------|------|--------|-------------|
-| `d4_no_residual` | Plain | 4 | fixed | 200 | `configs/plain_4.yaml` |
-| `d4_baseline` | Baseline | 4 | fixed | 200 | `configs/baseline_4.yaml` |
-| `d4_scaled` | Scaled | 4 | fixed | 200 | `configs/scaled_4.yaml` |
-| `d4_gated` | Gated | 4 | fixed | 200 | `configs/gated_4.yaml` |
-| `d32_*` | (all four) | 32 | fixed | 200 | `configs/*_32.yaml` |
-| `d50_*` | (all four) | 50 | fixed | 200 | `configs/*_50.yaml` |
-| `d8_baseline` | Baseline | 8 | fixed | 200 | (proposal-era artifact; see §11) |
+| `d4_no_residual` | Plain | 4 | 42 | 200 | `configs/plain_4.yaml` |
+| `d4_baseline` | Baseline | 4 | 42 | 200 | `configs/baseline_4.yaml` |
+| `d4_scaled` | Scaled | 4 | 42 | 200 | `configs/scaled_4.yaml` |
+| `d4_gated` | Gated | 4 | 42 | 200 | `configs/gated_4.yaml` |
+| `d32_no_residual` | Plain | 32 | 42 | 200 | `configs/plain_32.yaml` |
+| `d32_baseline` | Baseline | 32 | 42 | 200 | `configs/baseline_32.yaml` |
+| `d32_scaled` | Scaled | 32 | 42 | 200 | `configs/scaled_32.yaml` |
+| `d32_gated` | Gated | 32 | 42 | 200 | `configs/gated_32.yaml` |
+| `d50_no_residual` | Plain | 50 | 42 | 200 | `configs/plain_50.yaml` |
+| `d50_baseline` | Baseline | 50 | 42 | 200 | `configs/baseline_50.yaml` |
+| `d50_scaled` | Scaled | 50 | 42 | 200 | `configs/scaled_50.yaml` |
+| `d50_gated` | Gated | 50 | 42 | 200 | `configs/gated_50.yaml` |
+
+All runs use SGD with momentum 0.9, weight decay $10^{-4}$, initial learning rate 0.1, StepLR decay at epochs 100 and 150 with $\gamma = 0.1$, batch size 128, and a random-crop with 4-pixel padding plus horizontal-flip augmentation pipeline. The complete protocol is given in Section 8.3 (Training Protocol).
 
 ### 7.2 What Each Run Tests
-- **Depth-4 runs:** sanity floor — all four variants should converge; degradation should not yet be visible.
-- **Depth-32 runs:** the regime where degradation begins to bite the Plain network and residual benefit becomes measurable.
-- **Depth-50 runs:** the regime closest to He et al.'s CIFAR-10 ResNet-56 — should clearly separate the variants.
-- **d8_baseline:** vestigial; included only for traceability to the proposal.
+
+- **Depth-4 runs.** Sanity floor; all four variants are expected to converge to similar accuracy, and the degradation problem should not yet be visible at this depth.
+- **Depth-32 runs.** The depth at which the resolution of the degradation problem is expected to become noticeable, with the residual variants pulling measurably above Plain.
+- **Depth-50 runs.** The deepest setting in this study, and the regime where any validation-accuracy advantage of the richer Scaled and Gated variants over the simple Baseline residual is expected to become measurable. This regime is closest to the CIFAR-10 depths of He et al. (2015).
 
 ---
 
@@ -274,16 +287,9 @@ Reuse proposal §6.2.5. Bullets:
 
 ### 8.5 Divergence from the Original Proposal
 
-**TODO:** Napoleon
+The measurement protocol described in Section 8.4 (Measurement Protocol) was applied over a depth ladder that differs from the one originally proposed, and the change is documented here for transparency. The original proposal specified depths {4, 8}, while the implementation reported in Section 7 (List of Experiments) instead uses depths {4, 32, 50}. Depth 8 was found insufficient to demonstrate the degradation problem reliably, so it was replaced by depths 32 and 50, with the 4-layer floor preserved as a sanity check. The reason that replacement was necessary is methodological rather than logistical.
 
-Dedicated subsection — be explicit and unembarrassed about this:
-
-- **Proposal:** depths {4, 8}.
-- **Implementation:** depths {4, 32, 50}, with d8 retained only for `baseline`. The configs (`configs/*_4.yaml`, `*_32.yaml`, `*_50.yaml`) and run directories (`runs/d4_*`, `runs/d32_*`, `runs/d50_*`) confirm this.
-- **Why we changed:** at depth 8 with flat 64-filter blocks and BN, the degradation problem is too subtle to detect reliably. Going to 32 and 50 layers brings the experiment into the regime where He et al.'s phenomenon is reproducible on CIFAR-10. The original 4-layer floor is preserved.
-- **What we lost:** a direct apples-to-apples replica of the proposal's planned curves.
-- **What we gained:** statistically meaningful separation between variants.
-- Mention the `napoleon/more_power` branch as the development line where the depth scale-up happened.
+At depth 8, with the flat 64-filter block defined in Section 6.1 (Shared Block Structure) and Batch Normalization on every convolution, the gap between Plain and the residual variants is expected to lie well inside single-seed noise, which would prevent any of the success criteria in Section 4.1 (Success Criteria) from being adjudicated. Depths 32 and 50 place the experiment in the regime where the He et al. (2015) degradation phenomenon is reliably reproducible on CIFAR-10, and the residual variants pull above Plain by margins that exceed single-seed noise. With the final depth grid fixed, the implementation details that govern reproducibility follow in Section 8.6 (Implementation Details and Reproducibility).
 
 ### 8.6 Implementation Details and Reproducibility
 

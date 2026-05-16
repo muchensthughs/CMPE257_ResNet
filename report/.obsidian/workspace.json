@@ -1,0 +1,198 @@
+{
+  "main": {
+    "id": "3319f59575859f70",
+    "type": "split",
+    "children": [
+      {
+        "id": "47d7d26af40e3c4f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "abb5343c9eed6b53",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Final_Report.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Final_Report"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "256cff5958047ba4",
+    "type": "split",
+    "children": [
+      {
+        "id": "c45f70e6174df01c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "92bcbef7e272f227",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "190fb7de13e988d1",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "f59d943b51b69aff",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "8c68449848f1a51f",
+    "type": "split",
+    "children": [
+      {
+        "id": "1a49060a815e6c8c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1e34fd04176485de",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Final_Report.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Final_Report"
+            }
+          },
+          {
+            "id": "9d0b45f7b0cf1435",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Final_Report.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Final_Report"
+            }
+          },
+          {
+            "id": "299460d7bd514874",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "5637ad5123a37e6a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "ef730e468688b209",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Final_Report.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Final_Report"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "abb5343c9eed6b53",
+  "lastOpenFiles": [
+    "notebooks",
+    "Shared_Conceptual_Block.png",
+    "validation_100_epochs.png",
+    "training_validation_errors.png",
+    "gated_residual.png",
+    "training & validation errors.png",
+    "validation 100 epochs.png",
+    "gated_residual..md",
+    "Final_Report.md"
+  ]
+}
