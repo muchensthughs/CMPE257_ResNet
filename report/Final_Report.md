@@ -194,11 +194,7 @@ Reuse the proposal's §3 structure (it already has seven well-organized subsecti
 
 The Gated Residual variant replaces the static identity shortcut of the Baseline
 with a learned, input-dependent gate that modulates how much of the convolutional
-pathway $F(x)$ is added back to the shortcut. It is the most expressive of the
-four routing schemes considered in this study, and it is the only variant whose
-shortcut can adaptively "close" in response to the input.
-
-**Formal definition.** Each Gated block computes
+pathway $F(x)$ is added back to the shortcut. Each Gated block computes
 
 $$
 y \;=\; x \;+\; g(x) \,\odot\, F(x), \qquad g(x) \;=\; \sigma\!\big(W x + b\big),
@@ -207,91 +203,24 @@ $$
 where $\odot$ is element-wise multiplication, $\sigma$ is the logistic sigmoid,
 and $W \in \mathbb{R}^{C \times C}$ is implemented as a $1\!\times\!1$ convolution
 applied to the block input (so the gate has shape $[B, C, H, W]$, matching $F(x)$
-per channel and per spatial location). The shared $F(x)$ pathway is the same
-two-conv block used by every variant (`Conv2d(64)`–BN–ReLU–`Conv2d(64)`–BN), so
-any observed difference relative to Baseline is attributable to the gate alone.
-We initialize $W = 0$ and $b = 3$, so that $g(x) \approx \sigma(3) \approx 0.95$
-at the start of training — i.e., the block opens in a Highway-style configuration
+per channel and per spatial location). Specifically, We initialize $W = 0$ and $b = 3$,
+so that $g(x) \approx \sigma(3) \approx 0.95$ at the start of training — i.e.,
+so the block opens in a Highway-style configuration
 that is numerically close to the Baseline residual and lets the gate *learn* to
-close rather than starting from a closed state. The implementation lives in
+close. The implementation lives in
 `models/blocks/gated.py`.
 
-**Two limiting behaviors.** The two extreme regimes of the gate recover the
-other variants exactly:
+#### 6.5.1 Gradient signal through the gate
 
-- As $g(x) \to \mathbf{0}$, the block degenerates to $y = x$ — a pure identity
-  pass-through that forwards its input unchanged. This is functionally distinct
-  from the Plain network (which computes $y = F(x)$) and from the Baseline
-  (which computes $y = x + F(x)$): the gate-closed regime suppresses the
-  convolutional pathway entirely without substituting any other transformation.
-  If the optimizer drives $g(x)$ toward zero in deep blocks, this is direct
-  evidence that the network prefers to skip computation in those blocks.
-- As $g(x) \to \mathbf{1}$, the block recovers exactly $y = x + F(x)$, i.e., the
-  Baseline residual variant. In this limit the Gated block is functionally
-  indistinguishable from Baseline — there is no extra capacity, only the cost of
-  the gate's $1\!\times\!1$ convolution.
-
-Together with the smooth interpolation between these limits, this construction
-gives the Gated variant strict capacity superiority over Baseline in the
-function-class sense: the set of functions representable by a Gated block at
-fixed $F$ is a superset of those representable by a Baseline block at the same
-$F$. If Baseline ties or beats Gated empirically, the gap cannot be attributed
-to representational capacity — it must be an *optimization* or *generalization*
-phenomenon.
-
-**Why a $1\!\times\!1$ convolution for the gate.** A fully connected $Wx$ over a
-spatial feature map would couple all $C \cdot H \cdot W$ inputs and is
-prohibitive at our channel counts. The $1\!\times\!1$ conv is the standard,
-parameter-efficient realization of "$W x$ at every spatial location"; it adds
-only $C^2 + C$ parameters per block (4,160 at $C{=}64$), which is small relative
-to the two $3{\times}3$ convolutions in $F(x)$ ($\approx 73{\rm K}$ parameters
-each). The bias term is retained because the gate is not followed by
-BatchNorm — without it, the gate would be unable to express a non-zero
-preferred openness at initialization.
-
-**Gradient signal through the gate.** Differentiating the Gated update with
-respect to the block input,
-
+In the original Highway Networks (Srivastava et al., 2015), the shortcut path itself is multiplied by a learned carry gate. However, gating the skip connection introduces a critical risk. If the network drives the gate toward zero, the residual connection is disrupted. This effectively reverts the model back into a plain sequential network, reviving the gradient problems previously described. He et al. (2015) explicitly flagged this vulnerability, demonstrating that gated shortcuts underperform plain identity skips because they cannot guarantee an unobstructed gradient path to earlier layers.To resolve this, our Gated variant avoids this failure mode by shifting where the gate is applied. Instead of gating the shortcut, our architecture applies the gate exclusively to the residual branch ($F(x)$), leaving the identity shortcut ($x$) completely unhindered. Because the shortcut remains purely additive, the gradient flow is mathematically preserved. Differentiating this output with respect to the block input yields
 $$
 \frac{\partial y}{\partial x} \;=\; I \;+\; g(x)\,\frac{\partial F}{\partial x}
 \;+\; F(x)\,\frac{\partial g}{\partial x},
 $$
+As shown, the identity matrix $I$ ensures that even if the gate $g(x)$ saturates and attenuates the residual updates, a clean gradient path always remains open to propagate backward to earlier layers.
 
-the "$I$" term is the same direct gradient path that motivates the Baseline
-residual (Goodfellow §8.2.5): even if the gate is closed and the convolutional
-gradient $\partial F / \partial x$ is suppressed, the shortcut still routes a
-full-strength gradient to earlier layers. This is the structural property that
-distinguishes our Gated formulation from the *original* Highway Networks of
-Srivastava et al. (2015), where the shortcut itself is multiplied by a carry
-gate $(1 - g(x))$ and can therefore be choked off — exactly the failure mode He
-et al. §2 (2015) cited as evidence that gated shortcuts underperform identity
-shortcuts. Our Gated variant preserves the He-style identity skip *and* adds a
-gate on $F(x)$, so the variant is more accurately read as a Highway-inspired
-hybrid: it inherits Highway's adaptive routing capacity on the residual branch
-while keeping the identity-skip guarantee that He et al. argued is essential.
+![Gated Residual](gated_residual.png)
 
-**Relationship to the prior literature.** Beyond Highway Networks, the Gated
-variant connects directly to two more recent lines of work. First, the gate is
-the simplest form of *adaptive routing* (Vaswani et al., 2017 §3.2), which
-underlies attention's content-dependent selection: $g(x)$ here is the
-convolutional analog of attention's "how much should this channel be written?"
-question. Second, the per-channel scalar gate is a strict generalization of
-LayerScale's learned per-channel multiplier (Touvron et al., 2021): LayerScale
-replaces $g(x)$ with a *fixed* (input-independent) channel vector $\gamma$,
-which is recovered as a special case of our gate when $W = 0$ and $b$ is
-allowed to vary per channel.
-
-**A controlled test of He et al.'s claim.** He et al. §2 argued that gated
-shortcuts are strictly inferior to identity shortcuts at the depths they
-considered, on the grounds that any gate value below 1 attenuates the gradient
-signal. Our experiment is a controlled test of that claim at the small-to-medium
-depth regime relevant to most practical CIFAR-scale work. Because we preserve
-the identity skip and only gate $F(x)$, our setup is the most charitable
-formulation of the gated hypothesis: if Gated still underperforms (or merely
-ties) Baseline, the result corroborates the broader thesis that the simple
-identity shortcut is hard to beat. If Gated outperforms Baseline, it suggests
-that the original Highway critique was specific to its full-gate formulation
-and that a residual-branch gate is a genuinely useful modern primitive.
 
 ### 6.6 Why These Four Variants Form a Clean Ablation
 
