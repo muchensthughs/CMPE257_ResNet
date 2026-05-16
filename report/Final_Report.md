@@ -300,8 +300,10 @@ Reproducibility is enforced at several levels. Every experiment config fixes the
 
 ### 8.7 Code and Repositories
 
+The framework code and experiments:
+
 - Primary repo: `https://github.com/muchensthughs/CMPE257_ResNet`
-- Original prototyping notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
+- Original experiment runs notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
 
 The implementation depends on two external libraries. PyTorch provides the model, optimizer, scheduler, and training loop. Torchvision provides the CIFAR-10 dataset and image transforms. NumPy is used for the deterministic train/validation split, and PyYAML for config loading. The code base is original to this project.
 
