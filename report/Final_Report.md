@@ -467,10 +467,22 @@ enough that the depth-50 result deserves the multi-seed follow-up evaluation.
 
 ### 9.6 Gradient Flow Analysis
 
-**TODO:** Mu
-- Plot: L2 gradient norm vs. layer index for all four variants at depth 50, at epochs 1, 50, 150.
-- Expectation (per proposal §4.3): Plain shows steep decay toward early layers; residual variants stay flatter.
-- Cite **Goodfellow §8.2.5** when interpreting the curves.
+The gradient norm plots for 50 layer networks reveals the underlying reason for the differences in optimization for each variant. Ideally, the mean gradient norm should decrease over time to achieve a good convergence on the model. We can see this decrease happened for all three residual network after the LR decay except for plain network. The non-converging gradient norm indicates that the plain 50 model did not converge at all.
+
+The 50 layer Plain network already shows unstable gradient propagation at initialization. Rather than a flat or smoothly decaying profile, the Plain curve forms an inverted U-shape. This simultaneous explosion in the middle and near-zero signal at the output is a sign that the untrained plain network cannot propagate gradients coherently across 50 layers. On the other hand, the 4 layer Plain network has no such problem. It kept having reasonably flat gradient propagation throught the training process, which asligns with the observation in training and validation error - 4 layer plain network worked without degradation.
+
+At epoch 50, the 50 layer plain network gradient norms across layers inverted into a U-shape. This is a typical vanishing gradient behavior where the middle layer are not receiving much learning signal while the beginning and ending layers are updating. The three residual networks tell an opposite story, they maintained consistent gradient magnitudes on all layers, indicating a good gradient propagation across the network.
+
+After the second LR decay the four variants separate into two distinct groups. Plain sits alone at the top with gradients in the 0.1–0.4 range and a gently upward-trending profile — gradients are larger near the output than near the input, indicating the network is still making large adjustments near the loss while early layers receive comparatively weaker signal. The network has not converged even after 150 epochs. The three residual variants have all dropped to lower magnitudes as expected with a learning rate of 0.001, but their layer-wise profiles remain flat. One thing to note: Scaled's unusually low late-training gradients are consistent with the learned α parameters shrinking over time, attenuating the residual branch contribution and leaving less gradient to flow back through F(x).
+
+Overall, the gradient flow provide a clear diagnostic understanding of the accuracy results in Section 9.1. The degradation problem in the Plain network is not a generalization failure but an optimization failure caused by the network's inability to route gradient signal coherently across 50 layers. The identity shortcut in all three residual variants resolves this by guaranteeing a direct, unattenuated gradient path from the loss back through every block, keeping the full depth of the network actively learning throughout training.
+
+![Gradient Flow Over Time](9_6_mean_grad_norm_over_time.png)
+
+![Gradient Flow Variants Comparison d50](9_6_gradient_flow_per_variant_grid.png)
+
+![Gradient Flow Variants Comparison d4](9_6_grad_flow_d4_per_variant_grid.png)
+
 
 ### 9.7 Cross-Variant Comparison
 
