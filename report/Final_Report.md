@@ -444,7 +444,7 @@ $\alpha$.
 | 32    | 93.06%        | 93.02%          | **+0.04 pp**         |
 | 50    | 92.44%        | 92.20%          | **+0.24 pp**         |
 
-![Scaled vs Plain vs Base Training & Validation](report/training_validation_errors_scaled.png)
+![Scaled vs Plain vs Base Training & Validation](training_validation_errors_scaled.png)
 
 At depth 4, the $-0.18$ pp validation gap favors Baseline, and the $+0.05$ pp test 
 advantage for Scaled falls well within the single-seed noise band --- the two variants 
