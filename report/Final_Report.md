@@ -66,40 +66,61 @@ Two predictions are defined in advance to discipline the interpretation of resul
 Reuse the proposal's §3 structure (it already has seven well-organized subsections). Expand each subsection by ~30–50%. Integrate textbook citations as listed below.
 
 ### 5.1 The Vanishing Gradient Problem
-- Reuse proposal §3.1 wording (Hochreiter [4]).
-- Add **Goodfellow §8.2.5** for the modern reframing of the problem.
-- Add the formal inequality $\|\partial \mathcal{L}/\partial x_\text{early}\| \leq (\max \sigma)^L \cdot \|\partial \mathcal{L}/\partial x_\text{late}\|$.
+The vanishing gradient problem was formally identified by Hochreiter [4] in the context of RNNs. While training deep networks through backpropagation, the gradients are computed through repeated application of the chain rule. In traditional deep neural networks, this repeated multiplication causes gradients to decay towards zero at an exponential rate as they propagate towards the early layers of the network. This starves these layers of the critical information needed to adjust their weights and further tune the network, making the increasing number of deep layers harmful to the network's ability to train. 
+Formally, given a network of L layers with activation function σ, the gradient of the loss with respect to an early-layer activation xearly satisfies
+
+\begin{equation}
+  \left\| \frac{\partial L}{\partial \mathbf{x}_{\text{early}}} \right\|
+  \;\leq\;
+  \bigl(\max\,\sigma'\bigr)^{L}
+  \cdot
+  \left\| \frac{\partial L}{\partial \mathbf{x}_{\text{late}}} \right\|
+\end{equation}
+
+For a 50-layer network, using a saturating activation function such as sigmoid (max σ ′ = 0.25), the gradient is diluted by a factor of at most 0.2550 ≈ 10−30. This dilution gives an effective gradient of zero. Goodfellow et al. (§8.2.5) frame this as an inevitable consequence of the multiplicative structure
+of backpropagation across many non-linear transformations. The ReLU activation used in each of the four variants alleviates the worst saturation, but leaves the mutilative structure of the backpropagation. 
+The identity shortcut provides a direct gradient pathway to earlier layers, guaranteeing the learning signal reaches the layers regardless of the magnitude of the residual branch gradients.
 
 ### 5.2 Depth as a Representational Lever — VGG
-- Reuse proposal §3.2.
-- Add **Bishop §5.1** on universal approximation: a single hidden layer is enough *in theory* but exponentially wide; depth is the practical lever.
+
+The VGG architecture [9] showcased that depth, not width, was the primary lever to improve representational capacity within convolutional networks. VGG replaced large-kernel convolutions with a stack of 3x3 convolutional filters. This stacking design change was able to provide the network with the same effective receptive field while using fewer parameters and introducing more nonlinearity. 
+
+The findings made by Simonyan and Zisserman (2015) aligned with the theoretical bounds described in Bishop (§5.1), that while the universal approximation theorem states that a single hidden layer is theoretically sufficient to represent any continuous function, in practice, the neurons needed for the network can be exponential in the input dimension. The use of depth, however, allows for the efficient representation of the network's hierarchical features. VGG’s improvements allow for depths of 16 and 19 layers before accuracy begins to suffer and degrade. The results of VGG gave us a look into the power that depth can have in efficiency scaling deep networks, and exposed the limit for plain depth scaling, setting the stage for the degradation problem addressed in this paper.
+
 
 ### 5.3 Batch Normalization
-- Reuse proposal §3.3.
-- Cite **Goodfellow §8.7.1**.
-- **Critical sentence to add (used later in §6):** He et al. demonstrated that BN alone does **not** fix the degradation problem — the 34-layer plain net trained *with* BN still underperforms the 18-layer plain net. This rules out vanishing gradients as the sole cause and motivates a *structural* fix.
+
+Batch Normalization [5] addresses the problem of interval covariant shift. By normalizing each mini-batch of activation to zero mean and unit variance, rescaling and reshifting with learned parameters γ and β. Goodfellow et al. (§8.7.1) explain how this stabilizes the optimization landscape, which allows higher learning rates and reduces sensitivity to weight initialization.
+
+A critical observation of this study is that He et al. demonstrated that BN alone does not fix the degradation problem — the 34-layer plain net trained with BN still underperforms the 18-layer plain net. This rules out vanishing gradients as the sole cause and motivates a structural fix. For our experimentation, we included BN within every convolutional layer in the pathway. This inclusion ensured BN stayed a constant factor across each variant and did not explain any observed difference in validation accuracy or gradient flow.
 
 ### 5.4 Highway Networks — The Conceptual Precursor
-- Reuse proposal §3.4.
-- Explicitly frame Highway as the parent of our **Gated** variant.
-- Note (per He et al. §2): Highway gates *can* close, blocking the shortcut — a property our Gated variant inherits and that the Baseline avoids by design.
+
+Similarly, structural routing modifications emerged to address the vanishing gradients at the architectural level. Highway Networks [10] introduced gated shortcut connections capable of dynamically regulating the proportion of an input tensor transformed by a layer, rather than being carried forward unaltered. 
+
+Highway networks laid the foundational structure of our Gated variant, though highway networks fall victim to a key vulnerability in their design that our Gated variant avoids. He et al.[3] found that early gated shortcuts underperform plain identity skips due to not being able to guarantee an unobstructed gradient path. Later designs like the one used in our Gated variant apply the gate exclusively to our residual branch F(x) and leave the identity shortcut x permanently open, as described in Section 4.5.
 
 ### 5.5 Attention as Adaptive Routing
-- Reuse proposal §3.5.
-- Add one sentence linking attention's "soft selection" mechanism to the Gated variant's sigmoid gate.
+
+Attention mechanisms [1] extended the principle of adaptive weighting to sequence models, allowing networks to dynamically focus on relevant input features rather than compressing the entire input into a static vector. This data-dependent routing significantly improved performance in sequential tasks and laid the theoretical foundations for parameterized residual routing strategies, such as the gated residual variant explored in this study. This soft selection mechanism is utilized by our Gated variant’s sigmoid gate g(x)=σ(Wx+b). This sigmoid computes the input-dependent weight W, which is applied per-channel to the residual branch. This weight determines how much of our residual branch is added back into each block.
 
 ### 5.6 Transformers and Data-Dependent Routing
-- Reuse proposal §3.6.
-- Add a sentence noting transformers also use residual + LayerNorm — residual connectivity transcends CNNs.
+
+The Transformer architecture [11] further cemented the utility of dynamic information routing by replacing convolutional structures entirely with self-attention mechanisms, allowing long-range dependency modeling and highly parallelizable training. Each Transformer block wraps its sub-layers in a residual connection followed by Layer Normalization. This technique works outside of just CNNs and shows that residual connectivity is a key pillar of network optimization. Although originally designed for natural language processing, its reliance on adaptive, data-dependent routing highlights the broader relevance of the scaled and gated residual pathways evaluated in this study. 
 
 ### 5.7 MobileNetV2 — Residuals at the Efficiency Frontier
-- Reuse proposal §3.7.
-- One sentence on inverted residuals as evidence that the residual paradigm survives even under aggressive parameter budgets.
+
+The enduring importance of skip connections is further evidenced by MobileNetV2 [8], which combines depthwise separable convolutions with inverted residual bottleneck layers to maintain strong gradient flow and accuracy while significantly reducing computational cost. MobileNetV2 differs from other residual blocks by applying shortcuts in a low-dimensional space. This key difference showcases that identity shortcuts are effective even when the surrounding architecture is stripped back to a more parameter-efficient form. This shows that residual-style connections remain a cornerstone of scalable network design, even in architectures optimized for constrained environments.
 
 ### 5.8 Bias, Variance, and Regularization Context (NEW subsection)
-**TODO:** Maximilian Garcia
-- Brief paragraph grounding the project in classical generalization theory. Cite **Bishop §3.2** and **Murphy §6.4** for the decomposition $\mathbb{E}[(y - \hat f)^2] = \text{Bias}^2 + \text{Variance} + \sigma^2$.
-- Use this to justify our **deliberate omission of dropout**: BatchNorm + data augmentation already control variance; adding dropout on top would conflate the routing-variable ablation we are trying to isolate. (This is the same rationale He et al. give in §3.4 of the original ResNet paper.)
+
+The four routing variants presented in this study are evaluated under a deliberately constrained regularization procedure. This choice is backed by generalization theory. The expected squared error of a learning algorithm decomposed as:
+
+\begin{equation} \mathbb{E}\!\left[(y - \hat{f})^2\right] = \mathrm{Bias}^2[\hat{f}] + \mathrm{Var}[\hat{f}] + \sigma^2 \end{equation} 
+
+Bias^2 captures systemic underfitting, Var captures sensitivity to the particular training sample, and σ^2 is irreducible noise (Bishop, §3.2; Murphy, §6.4). Adding depth or model capacity reduces bias while simultaneously increasing variance. It is the regulator's job to control the variance term without the reintroduction of excessive bias.
+
+In our experiment, Batch Normalization and random cropping with additional horizontal flipping serve as variance controls. Batch Normalization reduces internal covariate shift with the added benefit of providing stochastic regularization through mini-batch statistics (Goodfellow, §8.7.1). Adding to the augmentation pipeline would further increase training diversity. However, adding dropout to our testing would alter the regularization procedure, conflating the routing-variable ablation. This aspect of the network would make it impossible for us to accurately attribute the differences in accuracy to specific network variants, a choice that He et al. (§3.4) CITE made as well. Therefore, we cite the exclusion of dropout from our study as not one of unintentional oversight, but one of methodical variable isolation. 
 
 ---
 
@@ -406,10 +427,48 @@ Overall, the Baseline results confirm that the degradation problem is solved by 
 
 ### 9.4 Scaled Residual
 
-**TODO:** Maximilian Garcia
-- Validation/training curves at all three depths.
-- **Bonus plot:** learned $\alpha$ value per residual block, per depth — this is the variant's free interpretability output. Does $\alpha$ stay near 1.0? Does it drift down (suggesting full-strength residuals are too aggressive)? Does it vary across block depth?
-- Discussion: did Scaled meaningfully outperform Baseline? If yes, at which depth? If no, what does that say about LayerScale-style mechanisms on small datasets?
+\paragraph{Training and validation curves.}
+Across the three depths of 4, 32, and 50, Scaled and Baseline reach nearly identical 
+near-zero training error asymptotes. Scaled converges to essentially 100\% training 
+accuracy by epoch 200, particularly at depths 32 and 50. This is expected given the 
+$\alpha = 1.0$ initialization, which places the Scaled variant in a numerically 
+identical starting state to Baseline. Both networks exhibit a sharp accuracy increase 
+through the first 25 epochs, slowing and plateauing through the mid-training phase. 
+The Scaled best-validation epoch falls in the same post-first-decay window as Baseline, 
+with no evidence of accelerated or improved convergence attributable to the scalar 
+$\alpha$.
+
+\paragraph{Comparison against Baseline.}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Depth} & \textbf{Scaled (test)} & \textbf{Baseline (test)} 
+    & \textbf{$\Delta$ test} \\
+\midrule
+4  & 89.64\% & 89.59\% & $+0.05$ pp \\
+32 & 93.06\% & 93.02\% & $+0.04$ pp \\
+50 & 92.44\% & 92.20\% & $+0.24$ pp \\
+\bottomrule
+\end{tabular}
+\caption{Test-set top-1 accuracy: Scaled vs.\ Baseline across three depths.}
+\end{table}
+
+![Scaled vs Plain vs Base Training & Validation](report/training_validation_errors_scaled.png)
+
+At depth 4, the $-0.18$ pp validation gap favors Baseline, and the $+0.05$ pp test 
+advantage for Scaled falls well within the single-seed noise band --- the two variants 
+are a tie. At depth 32, Scaled holds a $+0.32$ pp validation advantage, though the 
+corresponding test gap of only $+0.04$ pp does not corroborate this on the held-out 
+set, making the result inconclusive. At depth 50, Scaled pulls marginally ahead with 
+$+0.14$ pp on validation and $+0.24$ pp on test. While these small gains at greater 
+depth could be attributed to the learned scalar, they remain within or near the noise 
+band and do not constitute a defensible advantage. The added cost of 64 independent 
+scalars per block, therefore, does not justify choosing Scaled over Baseline on this 
+benchmark.
+
+
 
 ### 9.5 Gated Residual
 
