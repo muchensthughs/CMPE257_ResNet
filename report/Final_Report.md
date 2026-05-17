@@ -401,11 +401,6 @@ If we compare baseline network with plain network, they behave drastically diffe
 
 Overall, the Baseline results confirm that without overfitting, the degradation problem is solved by the a simple identity shortcut, without any learnable routing parameters.
 
-
-**TODO:** Mu
-- Same set of plots as §9.2 but for the Baseline variant.
-- One paragraph contrasting against Plain — is the degradation gone? By how much does d50 outperform d50 Plain?
-
 ### 9.4 Scaled Residual
 
 **TODO:** Maximilian Garcia
