@@ -174,11 +174,9 @@ The Baseline is the most important variant in this study not because it is expec
 
 ### 6.4 Variant 3 — Scaled Residual
 
-**TODO:** Max
-- Reuse proposal §5.2.
-- Equation: $y = x + \alpha \cdot F(x)$, $\alpha$ learnable scalar, initialized to $1.0$.
-- **Expand** with: this variant anticipates the **ReZero** (Bachlechner et al., 2020) and **LayerScale** (Touvron et al., 2021) mechanisms used in modern ViTs and ConvNeXt. (Add these references to §13.)
-- Diagnostic angle: record the learned $\alpha$ value per block per epoch — this is a free interpretability signal worth analyzing in Results.
+The Scaled Residual variant builds on the baseline residual network, replacing the fixed weight on the residual branch with a learnable per-channel scalar, which is applied element-wise to F(x) before adding in the identity shortcut x: y = x + α ⊙ F(x), α ∈ R C,
+
+here ⊙ denotes element-wise multiplication broadcast over the spatial dimensions. Each channel has an independent scalar α that controls the contributions of the channel to the residual output. At the start of training, all α values are initialized to all-ones to ensure equivalence to the Baseline residual. These initializations ensure changes in accuracy and gradient dynamics are reflections of what the scalar has learned, instead of asymmetrical starting states.
 
 ### 6.5 Variant 4 — Gated Residual
 
@@ -438,22 +436,13 @@ The Scaled best-validation epoch falls in the same post-first-decay window as Ba
 with no evidence of accelerated or improved convergence attributable to the scalar 
 $\alpha$.
 
-\paragraph{Comparison against Baseline.}
+**Headline numbers.** Best top-1 validation accuracy from `runs/d{4,32,50}_scaled/metrics_epoch.csv`:
 
-\begin{table}[h]
-\centering
-\begin{tabular}{@{}lccc@{}}
-\toprule
-\textbf{Depth} & \textbf{Scaled (test)} & \textbf{Baseline (test)} 
-    & \textbf{$\Delta$ test} \\
-\midrule
-4  & 89.64\% & 89.59\% & $+0.05$ pp \\
-32 & 93.06\% & 93.02\% & $+0.04$ pp \\
-50 & 92.44\% & 92.20\% & $+0.24$ pp \\
-\bottomrule
-\end{tabular}
-\caption{Test-set top-1 accuracy: Scaled vs.\ Baseline across three depths.}
-\end{table}
+| Depth | Scaled (test) | Baseline (test) | Δ (Scaled − Baseline) |
+|-------|---------------|-----------------|----------------------|
+| 4     | 89.64%        | 89.59%          | **+0.05 pp**         |
+| 32    | 93.06%        | 93.02%          | **+0.04 pp**         |
+| 50    | 92.44%        | 92.20%          | **+0.24 pp**         |
 
 ![Scaled vs Plain vs Base Training & Validation](report/training_validation_errors_scaled.png)
 
@@ -461,13 +450,11 @@ At depth 4, the $-0.18$ pp validation gap favors Baseline, and the $+0.05$ pp te
 advantage for Scaled falls well within the single-seed noise band --- the two variants 
 are a tie. At depth 32, Scaled holds a $+0.32$ pp validation advantage, though the 
 corresponding test gap of only $+0.04$ pp does not corroborate this on the held-out 
-set, making the result inconclusive. At depth 50, Scaled pulls marginally ahead with 
-$+0.14$ pp on validation and $+0.24$ pp on test. While these small gains at greater 
-depth could be attributed to the learned scalar, they remain within or near the noise 
-band and do not constitute a defensible advantage. The added cost of 64 independent 
+set, making the result inconclusive. At depth 50, Scaled pulls ahead with 
+$+0.14$ pp on validation and $+0.24$ pp on test, a marginal improvement. These small gains at greater depth could be attributed to the learned scalar; however, they remain near the noise 
+band and do not constitute a solid advantage. The added cost of 64 independent 
 scalars per block, therefore, does not justify choosing Scaled over Baseline on this 
 benchmark.
-
 
 
 ### 9.5 Gated Residual
@@ -570,9 +557,35 @@ Gated provided a small but consistent improvement over Baseline on both validati
 
 ### 9.8 Computational Overhead
 
-**TODO:** Maximilian
-- Small table: parameter count and wall-clock training time per variant per depth.
-- Argue (or refute) the cost/benefit case for Scaled and Gated.
+This subsection looks to quantify the parameter overhead and wall-clock cost introduced by the Scaled and Gated variants relative to the Plkain and Baseline variants in our study.
+
+Parameters: The four variants use a similar macro-architecture (stem, flat block stack, classification head) and the same convolutional pathway F(x) inside each block. Scaled utilizes an independent α ∈ R C per block (C = 64 parameters per block). Gated introduces a 1x1 consultation with bias per block (C^2 + C = 64^2 + 64 = 4,160 parameters per block). Plain and Base lack these added complexities and therefore are identical in size.
+
+| Variant  | Depth 4 | Depth 32  | Depth 50  | Extra params/block |
+|----------|---------|-----------|-----------|--------------------|
+| Plain    | 298,442 | 2,369,994 | 3,701,706 | 0                  |
+| Baseline | 298,442 | 2,369,994 | 3,701,706 | 0                  |
+| Scaled   | 298,698 | 2,372,042 | 3,704,906 | 64                 |
+| Gated    | 315,082 | 2,503,114 | 3,909,706 | 4,160              | 
+
+The Scaled variant’s addition of 64  additional scalars per block is a negligible size of only 0.09% f the total parameters at each depth. Gated provides a much higher, but still relatively small, overall increase. With 4160 parameters per block at a depth of 50. Because neither variant includes additional weight matrices, the added complexity can be attributed to their individual routing mechanisms. 
+
+
+| Variant  | Depth 4 avg/total | Depth 32 avg/total | Depth 50 avg/total |
+|----------|-------------------|--------------------|--------------------|
+| Plain    | 5.5 s / 18.3 min  | 31.0 s / 1 h 43 m  | 47.9 s / 2 h 40 m  |
+| Baseline | 5.5 s / 18.3 min  | 32.8 s / 1 h 49 m  | 50.7 s / 2 h 49 m  |
+| Scaled   | 5.6 s / 18.7 min  | 32.7 s / 1 h 49 m  | 54.9 s / 3 h 03 m  |
+| Gated    | 5.7 s / 19.1 min  | 42.0 s / 2 h 20 m  | 65.4 s / 3 h 38 m  |
+
+
+
+Cost/benefit evaluation: Using the data introduced in Section 7.7, we are able to make a direct evaluation of whether the added complexity of Scaled and Gated aided in our network's efficiency and accuracy.
+
+For Scaled, the cost of the added 64 scalars per block has nearly no measurable impact on wall-clock time and was nearly identical to our results of the Plain residual network for every depth, taking only 4.3 seconds slower on depth-50, a negligible amount. In conclusion, the scaled variant of the residual network provided no distinguishable benefit, and does not constitute its additional parameters, though how small they are. 
+
+Gated, with it’s 5.6% parameter increase at depth-50, and saw a 14.7 second increase in the overall time per epoch versus the plain variant. At depth-50, we see an increased on validation and test of +0.46 pp and +0.62 pp, respectively. These numbers on CIFAR-10 do provide a meaningful gain in performance at the cost of time, but depending on the application, these gains with the trade-off of complexity and time could make this variant not worth the additional complexity. 
+
 
 ---
 
