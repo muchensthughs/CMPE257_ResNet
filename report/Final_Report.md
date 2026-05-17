@@ -26,7 +26,7 @@ This problem is the depth-induced degradation documented in He et al. (2015, §1
 
 He et al. (2015) proposed a way to preconditioning the network to make optimization easier. Instead of asking each stacked layer to learn the complete underlying mapping H(x) directly, we can reformulate the learning problem so that the layer learns the residual F(x)=H(x)−x. The block output is then y=F(x)+x. Here the identity term x is essentially a shorcut connection connecting a few stacked layer as a block. This allows a faster and easier optimization if the actual desired transformation is identity mapping. Pushing F(x) to 0 is much easier than pushing a non linear function to identity.
 
-The additive shortcut also has an immediate consequence for gradient flow: differentiating the loss \mathcal{L} with respect to the block input gives $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ where the "+1" term guarantees that a direct gradient path exists from any layer back to the input, regardless of the magnitude of $\partial F / \partial x$ (Goodfellow et al., §8.2.5; Bishop §5.3). Even if the residual branch saturates or its gradients vanish, the identity shortcut ensures the learning signal propagates back to early layers.
+The additive shortcut also has an immediate consequence for gradient flow: differentiating the loss $\mathcal{L}$ with respect to the block input gives $\partial \mathcal{L} / \partial x = \partial \mathcal{L} / \partial y \cdot (1 + \partial F / \partial x)$ where the "+1" term guarantees that a direct gradient path exists from any layer back to the input, regardless of the magnitude of $\partial F / \partial x$ (Goodfellow et al., §8.2.5; Bishop §5.3). Even if the residual branch saturates or its gradients vanish, the identity shortcut ensures the learning signal propagates back to early layers.
 
 ### 3.3 Contributions of This Work
 
@@ -268,23 +268,20 @@ All runs use SGD with an initial learning rate of 0.1, momentum of 0.9, weight d
 
 We also made adjustment to the parameters in scaled and gated variant. The per-channel α parameter is excluded from weight decay so that regularization does not push them to zero. For Gated variant, the gate_conv bias parameters are also excluded to preserve the b=3 initialization that sets the gate near 0.95. All other parameters in both variants receive the standard weight decay of $1 \times 10^{-4}$.
 
-The scheduler applies a 5-epoch linear warmup from $1 \times 10^{-4}$ to 0.1, followed by StepLR with decay factor $\gamma = 0.1$
-at epochs 100 and 150, giving three phases: 0.1 for epochs 1–100, 0.01 for epochs 101–150, and 0.001 for epochs 151–200 (Goodfellow et al., §8.3.1).
+The scheduler applies a 5-epoch linear warmup from $1 \times 10^{-4}$ to 0.1, followed by StepLR with decay factor $\gamma = 0.1$ at epochs 100 and 150, giving three phases: 0.1 for epochs 1–100, 0.01 for epochs 101–150, and 0.001 for epochs 151–200 (Goodfellow et al., §8.3.1).
 
 Each run trains for 200 epochs with a batch size of 128. Incomplete final batches are dropped to keep batch statistics consistent for Batch Normalization. The loss function is cross-entropy applied directly to the raw logits. No dropout is used at any point. Batch Normalization and data augmentation are the only active regularizers.
 
 
 ### 8.4 Measurement Protocol
 
-Mean cross-entropy loss and top-1 accuracy over the training set and are recorded at the end of each epoch. Training error is used as the primary diagnotic metric for degradation problem because it is more related to optimization than generalization.
+Mean cross-entropy loss and top-1 accuracy over the training set are recorded at the end of each epoch. Training error is used as the primary diagnotic metric for degradation problem because it is more related to optimization than generalization.
 
 The model is also evaluated on the 5,000-image validation split after each training epoch with gradients disabled and batch normalization. We record validation loss and top-1 accuracy. The best validation accuracy across all 200 epochs is noted down, and the checkpoint at that epoch is saved as best.pt for subsequent test-set evaluation.
 
 The test set is evaluated exactly once per run, using the best.pt checkpoint selected by validation accuracy. Test evaluation reports top-1 accuracy, top-5 accuracy, and loss. The test set is never used to select hyperparameters or checkpoints — it exists solely to corroborate the validation findings reported in Section 9.1.
 
-After each backward pass we compute the L2 norm of the weight gradients for every Conv2d layer in the network and log them alongside the epoch metrics. Specifically, for a convolutional layer with weight tensor WW
-W, we record $\| \nabla_W \mathcal{L}\|_2$ at the end of the last batch of each epoch. We also record the mean norm across all Conv2d layers as a single scalar. These per-layer norms are what produce the gradient flow plots in Section 9.6 — plotting them against layer index at selected epochs shows whether gradient signal decays toward early layers (the signature of the degradation problem in plain networks) or stays roughly flat (the signature of healthy residual connectivity).
-
+After each backward pass we compute the L2 norm of the weight gradients for every Conv2d layer in the network and log them alongside the epoch metrics. Specifically, for a convolutional layer with weight tensor W, we record $\| \nabla_W \mathcal{L}\|_2$ at the end of the last batch of each epoch. We also record the mean norm across all Conv2d layers as a single scalar. These per-layer norms are what produce the gradient flow plots in Section 9.6 — plotting them against layer index at selected epochs shows whether gradient signal decays toward early layers (the signature of the degradation problem in plain networks) or stays roughly flat (the signature of healthy residual connectivity).
 
 ### 8.5 Divergence from the Original Proposal
 
@@ -294,20 +291,26 @@ At depth 8, with the flat 64-filter block defined in Section 6.1 (Shared Block S
 
 ### 8.6 Implementation Details and Reproducibility
 
-All experiments were implemented in PyTorch using torchvision for the CIFAR-10 dataset and transforms. Training was run on A100 with a single GPU per run.
+All experiments were implemented in PyTorch 2.10.0 with torchvision 0.25.0 (Python 3.12.13, CUDA 12.8), using the torchvision CIFAR-10 dataset and transforms. Each run was trained on a single NVIDIA A100 GPU.
 
-Reproducibility is enforced at several levels. Every experiment config fixes the random module seed as 42, which is applied before any model construction or data loading. The 90/10 train/validation split is generated with a fixed NumPy seed 42 and a deterministic shuffle, so the same 5,000 images form the validation set across all experiments. In addition, all model weights are initialized with deterministic schemes — Kaiming normal (He et al., 2015) for Conv2d layers, constant 1 and 0 for BatchNorm, and the routing-specific initializations ($\alpha = 1$ for Scaled, W=0 and b=3 for the Gated gate).
+Reproducibility is enforced at several levels:
+
+- **Random number generators.** Before any model construction or data loading, a fixed seed of 42 is applied to the Python `random` module, NumPy, the PyTorch CPU and CUDA random number generators, and the `PYTHONHASHSEED` environment variable.
+- **Train/validation split.** The 90/10 train/validation split is generated by seeding NumPy with 42 and shuffling the 50,000 CIFAR-10 training indices; the first 5,000 shuffled indices are assigned to the validation set and the remaining 45,000 to the training set, so an identical validation set is used across all experiments.
+- **Weight initialization.** Model weights are initialized deterministically: Kaiming normal initialization (`fan_out` mode, ReLU nonlinearity; He et al., 2015) for Conv2d layers, constant 1 and 0 for BatchNorm weight and bias, and routing-specific initializations for the variants — $\alpha = 1$ for Scaled, and $W = 0$, $b = 3$ for the Gated gate (see Section 6.5).
+- **Test set.** The official CIFAR-10 test set of 10,000 images is held out entirely from training and validation, and is used only for the final single-pass evaluation of the selected `best.pt` checkpoint. It is never used to tune hyperparameters or select checkpoints, so reported test accuracy reflects a true holdout.
 
 ### 8.7 Code and Repositories
 
 The framework code and experiments:
 
-- Primary repo: `https://github.com/muchensthughs/CMPE257_ResNet`
-- Original experiment runs notebook (Colab): `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
+- **Primary repo:** `https://github.com/muchensthughs/CMPE257_ResNet`
+- **Original experiment runs notebook (Colab):** `https://colab.research.google.com/drive/1nMPHSxqM1fVwguqIo2TaDhbgI0GPdYUU`
+- **Experiment artifacts (Google Drive):** `https://drive.google.com/drive/folders/1hGx-c_QuqQKqY3y0RyzSzw57028LVpsW?usp=drive_link`
 
 The implementation depends on two external libraries. PyTorch provides the model, optimizer, scheduler, and training loop. Torchvision provides the CIFAR-10 dataset and image transforms. NumPy is used for the deterministic train/validation split, and PyYAML for config loading. The code base is original to this project.
 
-All training scripts, config files, and the result CSVs and plots used in this report are committed to the repository. All experiment runs can be reproduced by checking out the repo and invoking the corresponding config. 
+All training scripts, config files, and the result CSVs and plots used in this report are committed to the repository. All experiment runs can be reproduced by checking out the repo and invoking the corresponding config.
 
 ---
 
@@ -391,15 +394,15 @@ The training curves show no sign of optimization difficulty. At all three depths
 
 Validation curves are noisier before epoch 100. This is expected since the high learning rate causes the curves to oscillate initially. The first LR decay drop the validation error quickly and stabilized the oscillations. Depth 32 and 50 reached even lower validation error then depth 4. This confirms that deeper network performs better than shallow ones, which is opposite of what we observed in plain networks.
 
-![Basline vs Plain after epoch 100](9_3_baseline_vs_plain_depth50_zoomed.png)
+
 
 ![Basline vs Plain Training](9_3_baseline_vs_plain_training_error.png)
 
 ![Basline vs Plain Validation](9_3_baseline_vs_plain_validation_error.png)
 
-If we compare baseline network with plain network, they behave drastically different behavior as the network go deeper. By epoch 100 the Baseline is already sitting near zero training error and around 8% validation error. The plain network at that point is still oscillating with training and validation error above 60%. Even after LR decays, the plain network still has a high training error of 20% by epoch 200. In the mean time, baseline has already converged.  
+If we compare baseline network with plain network, they behave drastically different behavior as the network go deeper. By epoch 100 the Baseline is already sitting near zero training error and around 8\% validation error. The plain network at that point is still oscillating with training and validation error above 60\%. Even after LR decays, the plain network still has a high training error of 20\% by epoch 200. In the mean time, baseline has already converged.  
 
-Overall, the Baseline results confirm that without overfitting, the degradation problem is solved by the a simple identity shortcut, without any learnable routing parameters.
+Overall, the Baseline results confirm that the degradation problem is solved by the a simple identity shortcut, without any learnable routing parameters.
 
 ### 9.4 Scaled Residual
 
@@ -467,15 +470,17 @@ enough that the depth-50 result deserves the multi-seed follow-up evaluation.
 
 ### 9.6 Gradient Flow Analysis
 
-The gradient norm plots for 50 layer networks reveals the underlying reason for the differences in optimization for each variant. Ideally, the mean gradient norm should decrease over time to achieve a good convergence on the model. We can see this decrease happened for all three residual network after the LR decay except for plain network. The non-converging gradient norm indicates that the plain 50 model did not converge at all.
+The gradient norm plots for the 50-layer networks reveal the underlying reason for the optimization differences observed across variants. For good convergence, the mean gradient norm is expected to decrease over the course of training. This decrease is observed for all three residual networks following the learning rate decay, but not for the Plain network. The Plain 50-layer model's non-converging gradient norm indicates that it did not converge at all.
 
-The 50 layer Plain network already shows unstable gradient propagation at initialization. Rather than a flat or smoothly decaying profile, the Plain curve forms an inverted U-shape. This simultaneous explosion in the middle and near-zero signal at the output is a sign that the untrained plain network cannot propagate gradients coherently across 50 layers. On the other hand, the 4 layer Plain network has no such problem. It kept having reasonably flat gradient propagation throught the training process, which asligns with the observation in training and validation error - 4 layer plain network worked without degradation.
+Unstable gradient propagation is already evident in the 50-layer Plain network at initialization. Rather than a flat or smoothly decaying profile, the Plain curve forms an inverted U-shape. The simultaneous explosion of signal in the middle layers and near-zero signal at the output shows that the untrained Plain network cannot propagate gradients coherently across 50 layers. No such problem is seen in the 4-layer Plain network, where reasonably flat gradient propagation is maintained throughout training. This aligns with the training and validation error observed at that depth, where the 4-layer Plain network operated without degradation.
 
-At epoch 50, the 50 layer plain network gradient norms across layers inverted into a U-shape. This is a typical vanishing gradient behavior where the middle layer are not receiving much learning signal while the beginning and ending layers are updating. The three residual networks tell an opposite story, they maintained consistent gradient magnitudes on all layers, indicating a good gradient propagation across the network.
+The same U-shaped profile is observed at epoch 50, where the 50-layer Plain network's per-layer gradient norms remain inverted. This is the characteristic signature of gradient starvation, in which the middle layers receive little learning signal while only the earliest and latest layers continue to update. An opposite story is told by the three residual networks, where consistent gradient magnitudes are maintained across all layers. The contrast is quantified by the ratio between the largest and smallest per-layer gradient norm, which exceeds fortyfold for the Plain network at epoch 50 but stays near twofold to threefold for every residual variant, indicating that gradient signal is propagated coherently through the full depth in all three.
 
-After the second LR decay the four variants separate into two distinct groups. Plain sits alone at the top with gradients in the 0.1–0.4 range and a gently upward-trending profile — gradients are larger near the output than near the input, indicating the network is still making large adjustments near the loss while early layers receive comparatively weaker signal. The network has not converged even after 150 epochs. The three residual variants have all dropped to lower magnitudes as expected with a learning rate of 0.001, but their layer-wise profiles remain flat. One thing to note: Scaled's unusually low late-training gradients are consistent with the learned α parameters shrinking over time, attenuating the residual branch contribution and leaving less gradient to flow back through F(x).
+A closer comparison among the three residual variants reveals a more subtle difference. Although all three maintain flat layer-wise profiles, their gradient magnitudes are not identical late in training. After the second learning rate decay, the Baseline and Scaled networks settle at comparable mean gradient norms, both near 0.003 at epoch 200, while the Gated network settles roughly three times higher, near 0.011. The Gated profile is also marginally less flat, with a layer-wise spread near threefold against roughly twofold for Baseline and Scaled. This difference is consistent with the gradient decomposition for the Gated block, in which the input gradient carries an additional term arising from the dependence of the gate on the input. Because this term has no counterpart in the Baseline or Scaled formulations, a modest increase in retained gradient signal is expected for the Gated variant, which the measured norms reflect.
 
-Overall, the gradient flow provide a clear diagnostic understanding of the accuracy results in Section 9.1. The degradation problem in the Plain network is not a generalization failure but an optimization failure caused by the network's inability to route gradient signal coherently across 50 layers. The identity shortcut in all three residual variants resolves this by guaranteeing a direct, unattenuated gradient path from the loss back through every block, keeping the full depth of the network actively learning throughout training.
+After the second learning rate decay, the four variants separate into two distinct groups. The Plain network sits alone at the top, with gradients in the 0.1 to 0.4 range and a gently upward-trending profile in which gradients are larger near the output than near the input. This indicates that large adjustments are still being made near the loss while the early layers receive comparatively weaker signal, and that convergence has not been reached even after 150 epochs. The three residual variants have all dropped to far lower magnitudes, as expected under a learning rate of 0.001, while their layer-wise profiles remain flat.
+
+Overall, a clear diagnostic understanding of the accuracy results in Section 9.1 is provided by the gradient flow analysis. The degradation problem in the Plain network is shown to be an optimization failure rather than a generalization failure, caused by the network's inability to route gradient signal coherently across 50 layers. This failure is resolved in all three residual variants by the identity shortcut, which guarantees a direct, unattenuated gradient path from the loss back through every block and keeps the full depth of the network actively learning throughout training.
 
 ![Gradient Flow Over Time](9_6_mean_grad_norm_over_time.png)
 
