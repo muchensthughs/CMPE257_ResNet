@@ -368,9 +368,9 @@ The plain experiment result answers our first research question clearly: the deg
 However, the situation changes slightly when we reach depth 32.
 Training error still goes down to near zero, but the validation curve now shows more noise. There is a clear sign of instability in the optimization process. Although it eventually settles and the network can still fit the training set, the noise in the middle epochs tells us something is not doing as good as before. 
 
-![Training](9_2_plain_training_error.png)
+![Plain Training](9_2_plain_training_error.png)
 
-![Validation](9_2_plain_validation_error.png)
+![Plain Validation](9_2_plain_validation_error.png)
 
 The degradation problem starts to appear in full at depth 50. Now training error stays at 20.84% at the final epoch. The network is misclassifying a high portion of image even after a few hundred epochs training. Validation error also stayed very high at 76.54%, which is a big drop compared to other depths. Also, the fact that training error and validation error both stayed high means this is not an overfitting problem but an optimization failure.
 
@@ -379,6 +379,28 @@ Even if we only look at training curves, there is still sign of difficulty in op
 This result shows that there is no increase in validation accuracy across different depths for the Plain network. Rather there is a collapse at depth 50 driven by a training failure. The degradation problem is reproducible under our implementation.
 
 ### 9.3 Baseline Residual
+
+
+In all three depths of baseline residual, the degradation problem has disappeared. We no longer see the high training and validation error in plain depth 50 network. Instead, with a simple identity residual connection, the training converges without any difficulty. It converges faster and more stable than the plain network even at shallower depths. We also see clear improvement in performance when network go deeper. The optimizer is able to exploit the added capacity brought by the additional depth. 
+
+![Baseline Training](9_3_baseline_training_error.png)
+
+![Baseline Validation](9_3_baseline_validation_error.png)
+
+The training curves show no sign of optimization difficulty. At all three depths, the training error drop drastically in the first epochs without much oscillation. Right after the first learning rate decay, it quickly drops to almost zero. All three depths perform comparatively good. The identity shortcut is sufficient to keep the optimizer working effectively even at 50 layers.
+
+Validation curves are noisier before epoch 100. This is expected since the high learning rate causes the curves to oscillate initially. The first LR decay drop the validation error quickly and stabilized the oscillations. Depth 32 and 50 reached even lower validation error then depth 4. This confirms that deeper network performs better than shallow ones, which is opposite of what we observed in plain networks.
+
+![Basline vs Plain after epoch 100](9_3_baseline_vs_plain_depth50_zoomed.png)
+
+![Basline vs Plain Training](9_3_baseline_vs_plain_training_error.png)
+
+![Basline vs Plain Validation](9_3_baseline_vs_plain_validation_error.png)
+
+If we compare baseline network with plain network, they behave drastically different behavior as the network go deeper. By epoch 100 the Baseline is already sitting near zero training error and around 8% validation error. The plain network at that point is still oscillating with training and validation error above 60%. Even after LR decays, the plain network still has a high training error of 20% by epoch 200. In the mean time, baseline has already converged.  
+
+Overall, the Baseline results confirm that without overfitting, the degradation problem is solved by the a simple identity shortcut, without any learnable routing parameters.
+
 
 **TODO:** Mu
 - Same set of plots as §9.2 but for the Baseline variant.
