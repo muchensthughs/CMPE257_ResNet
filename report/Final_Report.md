@@ -359,13 +359,24 @@ The test accuracy of each variant at each depth is visualized below.
 
 ![Test accuracy on CIFAR-10 by variant and depth, all variants](testing_accuracy_all_variants.png)
 **Test accuracy (Acc@1) on CIFAR-10 by variant and depth.** Plain's depth-50 bar drops to 75.16%, while the three residual variants remain above 92% at depths 32 and 50. Gated's depth-50 bar (92.82%) edges Baseline (92.20%) by 0.62 percentage points, the only within-residual cell to clear single-seed noise.
+
+
 ### 9.2 Reproducing the Degradation Problem (Plain Network)
 
-**TODO:** Mu
-- Plot: validation accuracy vs. epoch for `d4_no_residual`, `d32_no_residual`, `d50_no_residual` on one axis.
-- Plot: **training error** vs. epoch for the same — this is the critical figure for proving degradation (not overfitting).
-- Reuse proposal §4.1 / §4.2 wording for the expected vs. observed framing.
-- Explicitly state whether the prediction held.
+The plain experiment result answers our first research question clearly: the degradation problem does exist. The network converges normally at depth 4. Training error falls to 0.13% and validation accuracy reached 90.44%. This is consistent with what we would expect from a shallow network that is capable of the CIFAR10 classification task. There is no sign of optimization difficulty at this depth.
+
+However, the situation changes slightly when we reach depth 32.
+Training error still goes down to near zero, but the validation curve now shows more noise. There is a clear sign of instability in the optimization process. Although it eventually settles and the network can still fit the training set, the noise in the middle epochs tells us something is not doing as good as before. 
+
+![Training](9_2_plain_training_error.png)
+
+![Validation](9_2_plain_validation_error.png)
+
+The degradation problem starts to appear in full at depth 50. Now training error stays at 20.84% at the final epoch. The network is misclassifying a high portion of image even after a few hundred epochs training. Validation error also stayed very high at 76.54%, which is a big drop compared to other depths. Also, the fact that training error and validation error both stayed high means this is not an overfitting problem but an optimization failure.
+
+Even if we only look at training curves, there is still sign of difficulty in optimization. Instead of converging smoothly, the network oscillates at high error in the first 100 epochs. Then it drops sharply at the first leaning rate decay, and continue to oscillates before another drop at epoch 150. Even after both decays bring the learning rate down to 0.001, training error only reaches 20.84%,which is far above what any of the residual variants achieve within their first 25 epochs. 
+
+This result shows that there is no increase in validation accuracy across different depths for the Plain network. Rather there is a collapse at depth 50 driven by a training failure. The degradation problem is reproducible under our implementation.
 
 ### 9.3 Baseline Residual
 
