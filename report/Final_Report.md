@@ -60,67 +60,31 @@ Two predictions are defined in advance to discipline the interpretation of resul
 
 # 5. Related Work
 
-**TODO:** Max
-**Target length:** 2 – 3 pages
-
-Reuse the proposal's §3 structure (it already has seven well-organized subsections). Expand each subsection by ~30–50%. Integrate textbook citations as listed below.
+The architectural ideas evaluated in this study did not emerge in isolation. They are the product of a long progression of research into why deep networks are difficult to optimize and how that difficulty can be overcome. This section explores prior literature relevant to this research.
 
 ### 5.1 The Vanishing Gradient Problem
-The vanishing gradient problem was formally identified by Hochreiter [4] in the context of RNNs. While training deep networks through backpropagation, the gradients are computed through repeated application of the chain rule. In traditional deep neural networks, this repeated multiplication causes gradients to decay towards zero at an exponential rate as they propagate towards the early layers of the network. This starves these layers of the critical information needed to adjust their weights and further tune the network, making the increasing number of deep layers harmful to the network's ability to train. 
-Formally, given a network of L layers with activation function σ, the gradient of the loss with respect to an early-layer activation xearly satisfies
 
-\begin{equation}
-  \left\| \frac{\partial L}{\partial \mathbf{x}_{\text{early}}} \right\|
-  \;\leq\;
-  \bigl(\max\,\sigma'\bigr)^{L}
-  \cdot
-  \left\| \frac{\partial L}{\partial \mathbf{x}_{\text{late}}} \right\|
-\end{equation}
-
-For a 50-layer network, using a saturating activation function such as sigmoid (max σ ′ = 0.25), the gradient is diluted by a factor of at most 0.2550 ≈ 10−30. This dilution gives an effective gradient of zero. Goodfellow et al. (§8.2.5) frame this as an inevitable consequence of the multiplicative structure
-of backpropagation across many non-linear transformations. The ReLU activation used in each of the four variants alleviates the worst saturation, but leaves the mutilative structure of the backpropagation. 
-The identity shortcut provides a direct gradient pathway to earlier layers, guaranteeing the learning signal reaches the layers regardless of the magnitude of the residual branch gradients.
+The vanishing gradient problem was formally identified by Hochreiter [4] in the context of recurrent neural networks. When deep networks are trained through backpropagation, gradients are computed through repeated application of the chain rule. In traditional deep neural networks, this repeated multiplication causes gradients to decay toward zero at an exponential rate as they propagate toward the early layers. The early layers are thereby starved of the information needed to adjust their weights, which makes additional depth harmful to the network's ability to train.
 
 ### 5.2 Depth as a Representational Lever — VGG
 
-The VGG architecture [9] showcased that depth, not width, was the primary lever to improve representational capacity within convolutional networks. VGG replaced large-kernel convolutions with a stack of 3x3 convolutional filters. This stacking design change was able to provide the network with the same effective receptive field while using fewer parameters and introducing more nonlinearity. 
-
-The findings made by Simonyan and Zisserman (2015) aligned with the theoretical bounds described in Bishop (§5.1), that while the universal approximation theorem states that a single hidden layer is theoretically sufficient to represent any continuous function, in practice, the neurons needed for the network can be exponential in the input dimension. The use of depth, however, allows for the efficient representation of the network's hierarchical features. VGG’s improvements allow for depths of 16 and 19 layers before accuracy begins to suffer and degrade. The results of VGG gave us a look into the power that depth can have in efficiency scaling deep networks, and exposed the limit for plain depth scaling, setting the stage for the degradation problem addressed in this paper.
-
+While the vanishing gradient problem describes a barrier to depth, the VGG architecture [9] demonstrated that depth, rather than width, was the primary lever for improving representational capacity in convolutional networks. Large-kernel convolutions were replaced in VGG by stacks of $3 \times 3$ convolutional filters, a change that provided the same effective receptive field while using fewer parameters and introducing additional non-linearity.
 
 ### 5.3 Batch Normalization
 
-Batch Normalization [5] addresses the problem of interval covariant shift. By normalizing each mini-batch of activation to zero mean and unit variance, rescaling and reshifting with learned parameters γ and β. Goodfellow et al. (§8.7.1) explain how this stabilizes the optimization landscape, which allows higher learning rates and reduces sensitivity to weight initialization.
-
-A critical observation of this study is that He et al. demonstrated that BN alone does not fix the degradation problem — the 34-layer plain net trained with BN still underperforms the 18-layer plain net. This rules out vanishing gradients as the sole cause and motivates a structural fix. For our experimentation, we included BN within every convolutional layer in the pathway. This inclusion ensured BN stayed a constant factor across each variant and did not explain any observed difference in validation accuracy or gradient flow.
+Where VGG exposed a limit, Batch Normalization [5] addressed one of the obstacles standing in the way of it. The problem of internal covariate shift is mitigated by normalizing each mini-batch of activations to zero mean and unit variance, after which the activations are rescaled and reshifted by learned parameters $\gamma$ and $\beta$. The optimization landscape is thereby stabilized, which permits higher learning rates and reduces sensitivity to weight initialization (Goodfellow et al., §8.7.1).
 
 ### 5.4 Highway Networks — The Conceptual Precursor
 
-Similarly, structural routing modifications emerged to address the vanishing gradients at the architectural level. Highway Networks [10] introduced gated shortcut connections capable of dynamically regulating the proportion of an input tensor transformed by a layer, rather than being carried forward unaltered. 
+Beyond normalization, structural routing modifications were developed to address vanishing gradients at the architectural level. Gated shortcut connections were introduced by Highway Networks [10], capable of dynamically regulating the proportion of an input tensor that is transformed by a layer rather than carried forward unaltered. The foundational structure of the Gated variant is drawn from Highway Networks, although a key vulnerability in the original design is avoided. Early gated shortcuts were found by He et al. [3] to underperform plain identity skips, because an unobstructed gradient path could not be guaranteed when the shortcut itself was gated. This vulnerability is avoided in the Gated variant by applying the gate exclusively to the residual branch $F(x)$ and leaving the identity shortcut $x$ permanently open, as described in Section 4.5.
 
-Highway networks laid the foundational structure of our Gated variant, though highway networks fall victim to a key vulnerability in their design that our Gated variant avoids. He et al.[3] found that early gated shortcuts underperform plain identity skips due to not being able to guarantee an unobstructed gradient path. Later designs like the one used in our Gated variant apply the gate exclusively to our residual branch F(x) and leave the identity shortcut x permanently open, as described in Section 4.5.
+### 5.5 Deep Residual Learning — The Direct Reference
 
-### 5.5 Attention as Adaptive Routing
+The most direct precursor to this study is the deep residual learning framework of He et al. [3], in which the degradation problem was both named and addressed. It had been observed that accuracy saturates and then degrades as plain networks are made deeper, and crucially that this degradation appears in the training error rather than only the test error. The failure was therefore identified as one of optimization rather than overfitting, since a model with more capacity was found to be harder to optimize rather than more prone to memorization.
 
-Attention mechanisms [1] extended the principle of adaptive weighting to sequence models, allowing networks to dynamically focus on relevant input features rather than compressing the entire input into a static vector. This data-dependent routing significantly improved performance in sequential tasks and laid the theoretical foundations for parameterized residual routing strategies, such as the gated residual variant explored in this study. This soft selection mechanism is utilized by our Gated variant’s sigmoid gate g(x)=σ(Wx+b). This sigmoid computes the input-dependent weight W, which is applied per-channel to the residual branch. This weight determines how much of our residual branch is added back into each block.
+A structural reformulation of the learning objective was proposed in response. Rather than requiring a stack of layers to fit a desired underlying mapping $H(x)$ directly, the layers are instead made to fit a residual function $F(x) = H(x) - x$, so that the full mapping is recovered as $y = F(x) + x$ through an identity shortcut. The reasoning is that an optimizer can drive $F(x)$ toward zero far more easily than an identity mapping can be constructed from scratch through several non-linear layers.
 
-### 5.6 Transformers and Data-Dependent Routing
-
-The Transformer architecture [11] further cemented the utility of dynamic information routing by replacing convolutional structures entirely with self-attention mechanisms, allowing long-range dependency modeling and highly parallelizable training. Each Transformer block wraps its sub-layers in a residual connection followed by Layer Normalization. This technique works outside of just CNNs and shows that residual connectivity is a key pillar of network optimization. Although originally designed for natural language processing, its reliance on adaptive, data-dependent routing highlights the broader relevance of the scaled and gated residual pathways evaluated in this study. 
-
-### 5.7 MobileNetV2 — Residuals at the Efficiency Frontier
-
-The enduring importance of skip connections is further evidenced by MobileNetV2 [8], which combines depthwise separable convolutions with inverted residual bottleneck layers to maintain strong gradient flow and accuracy while significantly reducing computational cost. MobileNetV2 differs from other residual blocks by applying shortcuts in a low-dimensional space. This key difference showcases that identity shortcuts are effective even when the surrounding architecture is stripped back to a more parameter-efficient form. This shows that residual-style connections remain a cornerstone of scalable network design, even in architectures optimized for constrained environments.
-
-### 5.8 Bias, Variance, and Regularization Context (NEW subsection)
-
-The four routing variants presented in this study are evaluated under a deliberately constrained regularization procedure. This choice is backed by generalization theory. The expected squared error of a learning algorithm decomposed as:
-
-\begin{equation} \mathbb{E}\!\left[(y - \hat{f})^2\right] = \mathrm{Bias}^2[\hat{f}] + \mathrm{Var}[\hat{f}] + \sigma^2 \end{equation} 
-
-Bias^2 captures systemic underfitting, Var captures sensitivity to the particular training sample, and σ^2 is irreducible noise (Bishop, §3.2; Murphy, §6.4). Adding depth or model capacity reduces bias while simultaneously increasing variance. It is the regulator's job to control the variance term without the reintroduction of excessive bias.
-
-In our experiment, Batch Normalization and random cropping with additional horizontal flipping serve as variance controls. Batch Normalization reduces internal covariate shift with the added benefit of providing stochastic regularization through mini-batch statistics (Goodfellow, §8.7.1). Adding to the augmentation pipeline would further increase training diversity. However, adding dropout to our testing would alter the regularization procedure, conflating the routing-variable ablation. This aspect of the network would make it impossible for us to accurately attribute the differences in accuracy to specific network variants, a choice that He et al. (§3.4) CITE made as well. Therefore, we cite the exclusion of dropout from our study as not one of unintentional oversight, but one of methodical variable isolation. 
+Two properties of this design are central to the present study. First, the degradation problem was shown by He et al. to persist even when Batch Normalization is applied, which rules out vanishing gradients as the sole cause and establishes that a structural fix is required. Second, the identity shortcut provides an unattenuated gradient path from the loss back to the early layers, so that gradient signal is preserved regardless of the depth of the network. The baseline residual block evaluated in this study is taken directly from this framework, and the Scaled and Gated variants are constructed as controlled modifications of it, with the residual branch reweighted while the identity shortcut is left intact.
 
 ---
 
@@ -174,9 +138,15 @@ The Baseline is the most important variant in this study not because it is expec
 
 ### 6.4 Variant 3 — Scaled Residual
 
-The Scaled Residual variant builds on the baseline residual network, replacing the fixed weight on the residual branch with a learnable per-channel scalar, which is applied element-wise to F(x) before adding in the identity shortcut x: y = x + α ⊙ F(x), α ∈ R C,
+The Scaled Residual variant builds on the baseline residual network, replacing the fixed unit weight on the residual branch with a learnable per-channel scalar. This scalar is applied element-wise to $F(x)$ before the identity shortcut $x$ is added, giving
 
-here ⊙ denotes element-wise multiplication broadcast over the spatial dimensions. Each channel has an independent scalar α that controls the contributions of the channel to the residual output. At the start of training, all α values are initialized to all-ones to ensure equivalence to the Baseline residual. These initializations ensure changes in accuracy and gradient dynamics are reflections of what the scalar has learned, instead of asymmetrical starting states.
+$$y = x + \alpha \odot F(x), \qquad \alpha \in \mathbb{R}^{C},$$
+
+where $\odot$ denotes element-wise multiplication broadcast over the spatial dimensions. An independent scalar is assigned to each channel, so the contribution of that channel to the residual output is controlled separately. At the start of training, all entries of $\alpha$ are initialized to one, which makes the variant numerically identical to the Baseline residual at initialization. Any subsequent change in accuracy or gradient dynamics is therefore attributable to what the scalar has learned rather than to an asymmetric starting state.
+
+The scalar is excluded from weight decay. Because weight decay penalizes parameter magnitude, an unprotected $\alpha$ would be drawn toward zero throughout training, progressively attenuating the residual branch and defeating the purpose of the learnable scaling. Exclusion preserves the $\alpha = 1$ initialization as the operating point from which the network is free to increase or decrease each channel's residual contribution.
+
+![Scaled Residual High Level Architecture](scaled_residual.png)
 
 ### 6.5 Variant 4 — Gated Residual
 
