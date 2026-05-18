@@ -60,46 +60,31 @@ Two predictions are defined in advance to discipline the interpretation of resul
 
 # 5. Related Work
 
-**TODO:** Max
-**Target length:** 2 – 3 pages
-
-Reuse the proposal's §3 structure (it already has seven well-organized subsections). Expand each subsection by ~30–50%. Integrate textbook citations as listed below.
+The architectural ideas evaluated in this study did not emerge in isolation. They are the product of a long progression of research into why deep networks are difficult to optimize and how that difficulty can be overcome. This section explores prior literature relevant to this research.
 
 ### 5.1 The Vanishing Gradient Problem
-- Reuse proposal §3.1 wording (Hochreiter [4]).
-- Add **Goodfellow §8.2.5** for the modern reframing of the problem.
-- Add the formal inequality $\|\partial \mathcal{L}/\partial x_\text{early}\| \leq (\max \sigma)^L \cdot \|\partial \mathcal{L}/\partial x_\text{late}\|$.
+
+The vanishing gradient problem was formally identified by Hochreiter [4] in the context of recurrent neural networks. When deep networks are trained through backpropagation, gradients are computed through repeated application of the chain rule. In traditional deep neural networks, this repeated multiplication causes gradients to decay toward zero at an exponential rate as they propagate toward the early layers. The early layers are thereby starved of the information needed to adjust their weights, which makes additional depth harmful to the network's ability to train.
 
 ### 5.2 Depth as a Representational Lever — VGG
-- Reuse proposal §3.2.
-- Add **Bishop §5.1** on universal approximation: a single hidden layer is enough *in theory* but exponentially wide; depth is the practical lever.
+
+While the vanishing gradient problem describes a barrier to depth, the VGG architecture [9] demonstrated that depth, rather than width, was the primary lever for improving representational capacity in convolutional networks. Large-kernel convolutions were replaced in VGG by stacks of $3 \times 3$ convolutional filters, a change that provided the same effective receptive field while using fewer parameters and introducing additional non-linearity.
 
 ### 5.3 Batch Normalization
-- Reuse proposal §3.3.
-- Cite **Goodfellow §8.7.1**.
-- **Critical sentence to add (used later in §6):** He et al. demonstrated that BN alone does **not** fix the degradation problem — the 34-layer plain net trained *with* BN still underperforms the 18-layer plain net. This rules out vanishing gradients as the sole cause and motivates a *structural* fix.
+
+Where VGG exposed a limit, Batch Normalization [5] addressed one of the obstacles standing in the way of it. The problem of internal covariate shift is mitigated by normalizing each mini-batch of activations to zero mean and unit variance, after which the activations are rescaled and reshifted by learned parameters $\gamma$ and $\beta$. The optimization landscape is thereby stabilized, which permits higher learning rates and reduces sensitivity to weight initialization (Goodfellow et al., §8.7.1).
 
 ### 5.4 Highway Networks — The Conceptual Precursor
-- Reuse proposal §3.4.
-- Explicitly frame Highway as the parent of our **Gated** variant.
-- Note (per He et al. §2): Highway gates *can* close, blocking the shortcut — a property our Gated variant inherits and that the Baseline avoids by design.
 
-### 5.5 Attention as Adaptive Routing
-- Reuse proposal §3.5.
-- Add one sentence linking attention's "soft selection" mechanism to the Gated variant's sigmoid gate.
+Beyond normalization, structural routing modifications were developed to address vanishing gradients at the architectural level. Gated shortcut connections were introduced by Highway Networks [10], capable of dynamically regulating the proportion of an input tensor that is transformed by a layer rather than carried forward unaltered. The foundational structure of the Gated variant is drawn from Highway Networks, although a key vulnerability in the original design is avoided. Early gated shortcuts were found by He et al. [3] to underperform plain identity skips, because an unobstructed gradient path could not be guaranteed when the shortcut itself was gated. This vulnerability is avoided in the Gated variant by applying the gate exclusively to the residual branch $F(x)$ and leaving the identity shortcut $x$ permanently open, as described in Section 4.5.
 
-### 5.6 Transformers and Data-Dependent Routing
-- Reuse proposal §3.6.
-- Add a sentence noting transformers also use residual + LayerNorm — residual connectivity transcends CNNs.
+### 5.5 Deep Residual Learning — The Direct Reference
 
-### 5.7 MobileNetV2 — Residuals at the Efficiency Frontier
-- Reuse proposal §3.7.
-- One sentence on inverted residuals as evidence that the residual paradigm survives even under aggressive parameter budgets.
+The most direct precursor to this study is the deep residual learning framework of He et al. [3], in which the degradation problem was both named and addressed. It had been observed that accuracy saturates and then degrades as plain networks are made deeper, and crucially that this degradation appears in the training error rather than only the test error. The failure was therefore identified as one of optimization rather than overfitting, since a model with more capacity was found to be harder to optimize rather than more prone to memorization.
 
-### 5.8 Bias, Variance, and Regularization Context (NEW subsection)
-**TODO:** Maximilian Garcia
-- Brief paragraph grounding the project in classical generalization theory. Cite **Bishop §3.2** and **Murphy §6.4** for the decomposition $\mathbb{E}[(y - \hat f)^2] = \text{Bias}^2 + \text{Variance} + \sigma^2$.
-- Use this to justify our **deliberate omission of dropout**: BatchNorm + data augmentation already control variance; adding dropout on top would conflate the routing-variable ablation we are trying to isolate. (This is the same rationale He et al. give in §3.4 of the original ResNet paper.)
+A structural reformulation of the learning objective was proposed in response. Rather than requiring a stack of layers to fit a desired underlying mapping $H(x)$ directly, the layers are instead made to fit a residual function $F(x) = H(x) - x$, so that the full mapping is recovered as $y = F(x) + x$ through an identity shortcut. The reasoning is that an optimizer can drive $F(x)$ toward zero far more easily than an identity mapping can be constructed from scratch through several non-linear layers.
+
+Two properties of this design are central to the present study. First, the degradation problem was shown by He et al. to persist even when Batch Normalization is applied, which rules out vanishing gradients as the sole cause and establishes that a structural fix is required. Second, the identity shortcut provides an unattenuated gradient path from the loss back to the early layers, so that gradient signal is preserved regardless of the depth of the network. The baseline residual block evaluated in this study is taken directly from this framework, and the Scaled and Gated variants are constructed as controlled modifications of it, with the residual branch reweighted while the identity shortcut is left intact.
 
 ---
 
@@ -153,11 +138,15 @@ The Baseline is the most important variant in this study not because it is expec
 
 ### 6.4 Variant 3 — Scaled Residual
 
-**TODO:** Max
-- Reuse proposal §5.2.
-- Equation: $y = x + \alpha \cdot F(x)$, $\alpha$ learnable scalar, initialized to $1.0$.
-- **Expand** with: this variant anticipates the **ReZero** (Bachlechner et al., 2020) and **LayerScale** (Touvron et al., 2021) mechanisms used in modern ViTs and ConvNeXt. (Add these references to §13.)
-- Diagnostic angle: record the learned $\alpha$ value per block per epoch — this is a free interpretability signal worth analyzing in Results.
+The Scaled Residual variant builds on the baseline residual network, replacing the fixed unit weight on the residual branch with a learnable per-channel scalar. This scalar is applied element-wise to $F(x)$ before the identity shortcut $x$ is added, giving
+
+$$y = x + \alpha \odot F(x), \qquad \alpha \in \mathbb{R}^{C},$$
+
+where $\odot$ denotes element-wise multiplication broadcast over the spatial dimensions. An independent scalar is assigned to each channel, so the contribution of that channel to the residual output is controlled separately. At the start of training, all entries of $\alpha$ are initialized to one, which makes the variant numerically identical to the Baseline residual at initialization. Any subsequent change in accuracy or gradient dynamics is therefore attributable to what the scalar has learned rather than to an asymmetric starting state.
+
+The scalar is excluded from weight decay. Because weight decay penalizes parameter magnitude, an unprotected $\alpha$ would be drawn toward zero throughout training, progressively attenuating the residual branch and defeating the purpose of the learnable scaling. Exclusion preserves the $\alpha = 1$ initialization as the operating point from which the network is free to increase or decrease each channel's residual contribution.
+
+![Scaled Residual High Level Architecture](scaled_residual.png)
 
 ### 6.5 Variant 4 — Gated Residual
 
@@ -406,10 +395,37 @@ Overall, the Baseline results confirm that the degradation problem is solved by 
 
 ### 9.4 Scaled Residual
 
-**TODO:** Maximilian Garcia
-- Validation/training curves at all three depths.
-- **Bonus plot:** learned $\alpha$ value per residual block, per depth — this is the variant's free interpretability output. Does $\alpha$ stay near 1.0? Does it drift down (suggesting full-strength residuals are too aggressive)? Does it vary across block depth?
-- Discussion: did Scaled meaningfully outperform Baseline? If yes, at which depth? If no, what does that say about LayerScale-style mechanisms on small datasets?
+\paragraph{Training and validation curves.}
+Across the three depths of 4, 32, and 50, Scaled and Baseline reach nearly identical 
+near-zero training error asymptotes. Scaled converges to essentially 100\% training 
+accuracy by epoch 200, particularly at depths 32 and 50. This is expected given the 
+$\alpha = 1.0$ initialization, which places the Scaled variant in a numerically 
+identical starting state to Baseline. Both networks exhibit a sharp accuracy increase 
+through the first 25 epochs, slowing and plateauing through the mid-training phase. 
+The Scaled best-validation epoch falls in the same post-first-decay window as Baseline, 
+with no evidence of accelerated or improved convergence attributable to the scalar 
+$\alpha$.
+
+**Headline numbers.** Best top-1 validation accuracy from `runs/d{4,32,50}_scaled/metrics_epoch.csv`:
+
+| Depth | Scaled (test) | Baseline (test) | Δ (Scaled − Baseline) |
+|-------|---------------|-----------------|----------------------|
+| 4     | 89.64%        | 89.59%          | **+0.05 pp**         |
+| 32    | 93.06%        | 93.02%          | **+0.04 pp**         |
+| 50    | 92.44%        | 92.20%          | **+0.24 pp**         |
+
+![Scaled vs Plain vs Base Training & Validation](training_validation_errors_scaled.png)
+
+At depth 4, the $-0.18$ pp validation gap favors Baseline, and the $+0.05$ pp test 
+advantage for Scaled falls well within the single-seed noise band --- the two variants 
+are a tie. At depth 32, Scaled holds a $+0.32$ pp validation advantage, though the 
+corresponding test gap of only $+0.04$ pp does not corroborate this on the held-out 
+set, making the result inconclusive. At depth 50, Scaled pulls ahead with 
+$+0.14$ pp on validation and $+0.24$ pp on test, a marginal improvement. These small gains at greater depth could be attributed to the learned scalar; however, they remain near the noise 
+band and do not constitute a solid advantage. The added cost of 64 independent 
+scalars per block, therefore, does not justify choosing Scaled over Baseline on this 
+benchmark.
+
 
 ### 9.5 Gated Residual
 
@@ -511,9 +527,35 @@ Gated provided a small but consistent improvement over Baseline on both validati
 
 ### 9.8 Computational Overhead
 
-**TODO:** Maximilian
-- Small table: parameter count and wall-clock training time per variant per depth.
-- Argue (or refute) the cost/benefit case for Scaled and Gated.
+This subsection looks to quantify the parameter overhead and wall-clock cost introduced by the Scaled and Gated variants relative to the Plkain and Baseline variants in our study.
+
+Parameters: The four variants use a similar macro-architecture (stem, flat block stack, classification head) and the same convolutional pathway F(x) inside each block. Scaled utilizes an independent α ∈ R C per block (C = 64 parameters per block). Gated introduces a 1x1 consultation with bias per block (C^2 + C = 64^2 + 64 = 4,160 parameters per block). Plain and Base lack these added complexities and therefore are identical in size.
+
+| Variant  | Depth 4 | Depth 32  | Depth 50  | Extra params/block |
+|----------|---------|-----------|-----------|--------------------|
+| Plain    | 298,442 | 2,369,994 | 3,701,706 | 0                  |
+| Baseline | 298,442 | 2,369,994 | 3,701,706 | 0                  |
+| Scaled   | 298,698 | 2,372,042 | 3,704,906 | 64                 |
+| Gated    | 315,082 | 2,503,114 | 3,909,706 | 4,160              | 
+
+The Scaled variant’s addition of 64  additional scalars per block is a negligible size of only 0.09% f the total parameters at each depth. Gated provides a much higher, but still relatively small, overall increase. With 4160 parameters per block at a depth of 50. Because neither variant includes additional weight matrices, the added complexity can be attributed to their individual routing mechanisms. 
+
+
+| Variant  | Depth 4 avg/total | Depth 32 avg/total | Depth 50 avg/total |
+|----------|-------------------|--------------------|--------------------|
+| Plain    | 5.5 s / 18.3 min  | 31.0 s / 1 h 43 m  | 47.9 s / 2 h 40 m  |
+| Baseline | 5.5 s / 18.3 min  | 32.8 s / 1 h 49 m  | 50.7 s / 2 h 49 m  |
+| Scaled   | 5.6 s / 18.7 min  | 32.7 s / 1 h 49 m  | 54.9 s / 3 h 03 m  |
+| Gated    | 5.7 s / 19.1 min  | 42.0 s / 2 h 20 m  | 65.4 s / 3 h 38 m  |
+
+
+
+Cost/benefit evaluation: Using the data introduced in Section 7.7, we are able to make a direct evaluation of whether the added complexity of Scaled and Gated aided in our network's efficiency and accuracy.
+
+For Scaled, the cost of the added 64 scalars per block has nearly no measurable impact on wall-clock time and was nearly identical to our results of the Plain residual network for every depth, taking only 4.3 seconds slower on depth-50, a negligible amount. In conclusion, the scaled variant of the residual network provided no distinguishable benefit, and does not constitute its additional parameters, though how small they are. 
+
+Gated, with it’s 5.6% parameter increase at depth-50, and saw a 14.7 second increase in the overall time per epoch versus the plain variant. At depth-50, we see an increased on validation and test of +0.46 pp and +0.62 pp, respectively. These numbers on CIFAR-10 do provide a meaningful gain in performance at the cost of time, but depending on the application, these gains with the trade-off of complexity and time could make this variant not worth the additional complexity. 
+
 
 ---
 
